@@ -1,11 +1,13 @@
 # This benchmark is an extension to the benchmark explained at
 # https://pytorch.org/hub/pytorch_vision_resnet/
 
-import time
 import torch
+import torchvision.models as models
+from torchvision import transforms
+
+import time
 import urllib
 from PIL import Image
-from torchvision import transforms
 
 
 def inference(model, data):
@@ -26,9 +28,7 @@ def inference(model, data):
 
 
 def get_model():
-    model = torch.hub.load('pytorch/vision:v0.10.0',
-                           'resnet50',
-                           pretrained=True)
+    model = models.resnet50(pretrained=True)
     model.eval()
     return model
 
