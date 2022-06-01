@@ -9,7 +9,8 @@ install_torch() {
 install_deps() {
     sudo apt update --yes
     sudo apt install python3-pip --yes
-    sudo apt-get install python-is-python3 python3-autopep8 pylint --yes
+    sudo apt install python-is-python3 python3-autopep8 pylint --yes
+    sudo apt install numactl --yes
 }
 
 # Check the number of arguments

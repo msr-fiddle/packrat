@@ -1,30 +1,32 @@
 # This benchmark is an extension to the benchmark explained at
 # https://pytorch.org/hub/pytorch_vision_resnet/
 
+import os
+import time
+import urllib
+from PIL import Image
 import torch
 import torchvision.models as models
 from torchvision import transforms
 
-import time
-import urllib
-from PIL import Image
-
 
 def inference(model, data):
     with torch.no_grad():
-        for i in range(100):
+        for _ in range(100):
             model(data)
 
         num_threads = torch.get_num_threads()
+        omp_threads = os.environ.get("OMP_NUM_THREADS")
+        assert num_threads == int(omp_threads)
 
         # TODO: Use benchmark APIs
         # https://pytorch.org/tutorials/recipes/recipes/benchmark.html
-        start = time.time()
-        for i in range(100):
-            output = model(data)
-        end = time.time()
+        start_time = time.time()
+        for _ in range(100):
+            _output = model(data)
+        end_time = time.time()
         print('Threads {:d}, Time {:.2f} ms'.format(
-            num_threads, (end - start) / 100 * 1000))
+            num_threads, (end_time - start_time) / 100 * 1000))
 
 
 def get_model():
@@ -37,8 +39,8 @@ def get_test_data():
     url, filename = (
         "https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog.jpg")
     try:
-        urllib.URLopener().retrieve(url, filename)
-    except:
+        urllib.request.urlretrieve(url, filename)
+    except urllib.error.HTTPError:
         urllib.request.urlretrieve(url, filename)
     input_image = Image.open(filename)
 
@@ -54,11 +56,11 @@ def get_test_data():
     return input_batch
 
 
-def main():
+def start():
     model = get_model()
     data = get_test_data()
     inference(model, data)
 
 
 if __name__ == '__main__':
-    main()
+    start()
