@@ -5,3 +5,10 @@
 **/__pycache__/**
 **/*.pyc
 **/*.pyo
+
+# vscode
+**/.vscode
+
+# data and plots
+**/*.csv
+**/*.png
