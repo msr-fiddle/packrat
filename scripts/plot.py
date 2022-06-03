@@ -41,7 +41,7 @@ class MyTheme(theme_gray):
 def plot_benchmark_latency(benchmarks):
     "Plots a latency graph for every data-structure in the results file"
 
-    plot = ggplot(data=benchmarks, mapping=aes(x='threads', y='latency')) + \
+    plot = ggplot(data=benchmarks, mapping=aes(x='threads', y='latency', group=1)) + \
         MyTheme(base_size=10) + labs(y="Latency [ms]") + \
         theme(legend_position='top', legend_title=element_blank()) + \
         scale_x_continuous(
