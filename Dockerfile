@@ -14,4 +14,4 @@ RUN /bin/bash setup.sh torch
 WORKDIR /app
 
 # Run the program
-CMD [ "python3", "run.py" ]
+CMD [ "python3", "run.py", "resnet", "manual" ]

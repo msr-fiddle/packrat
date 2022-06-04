@@ -1,10 +1,13 @@
-# This benchmark is an extension to the benchmark explained at
-# https://pytorch.org/hub/pytorch_vision_resnet/
+"""
+This benchmark is an extension to the benchmark explained at
+https://pytorch.org/hub/pytorch_vision_resnet/
+"""
 
 import csv
 import math
 import os
 import subprocess
+import sys
 import time
 import urllib
 from PIL import Image
@@ -14,7 +17,11 @@ import torchvision.models as models
 from torchvision import transforms
 
 
-def inference(model, data):
+def run_inference(model, data):
+    return model(data)
+
+
+def inference_manual(model, data):
     sockets = int(subprocess.check_output(
         'cat /proc/cpuinfo | grep "physical id" | sort -u | wc -l', shell=True))
     cores_per_socket = psutil.cpu_count(logical=False) / sockets
@@ -35,18 +42,35 @@ def inference(model, data):
 
     with torch.no_grad():
         for _ in range(100):
-            model(data)
+            run_inference(model, data)
 
     # TODO: Use benchmark APIs
     # https://pytorch.org/tutorials/recipes/recipes/benchmark.html
     start_time = time.time()
     for _ in range(100):
-        _output = model(data)
+        _output = run_inference(model, data)
     end_time = time.time()
     average_latency = ((end_time - start_time) * 1000) / 100
     print('Threads {:d}, Time {:.2f} ms'.format(
         num_threads, average_latency))
     writer.writerow([num_threads, average_latency])
+
+
+def inference_benchmark(model, data):
+    import torch.utils.benchmark as benchmark
+    num_threads = int(os.environ.get("OMP_NUM_THREADS"))
+    timer = benchmark.Timer(stmt="run_inference(model, data)",
+                            setup="from __main__ import run_inference",
+                            globals={
+                                "model": model,
+                                "data": data,
+                            },
+                            num_threads=num_threads,
+                            label="Latency Measurement",
+                            sub_label="torch.utils.benchmark.").blocked_autorange(min_run_time=5)
+
+    print(
+        f"Thread {num_threads}, Mean: {timer.mean * 1e3:6.2f} ms, Median: {timer.median * 1e3:6.2f} ms")
 
 
 def get_model():
@@ -76,11 +100,19 @@ def get_test_data():
     return input_batch
 
 
-def start():
+def start(r_type):
     model = get_model()
     data = get_test_data()
-    inference(model, data)
+
+    if r_type == "default":
+        inference_benchmark(model, data)
+    elif r_type == "manual":
+        inference_manual(model, data)
 
 
 if __name__ == '__main__':
-    start()
+    if len(sys.argv) < 1:
+        print("Usage: python3 resnet.py default/manual")
+        sys.exit(1)
+
+    start(sys.argv[1])
