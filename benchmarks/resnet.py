@@ -4,14 +4,11 @@ https://pytorch.org/hub/pytorch_vision_resnet/
 """
 
 import csv
-import math
 import os
-import subprocess
 import sys
 import time
 import urllib
 from PIL import Image
-import psutil
 import torch
 import torchvision.models as models
 from torchvision import transforms
@@ -21,31 +18,27 @@ def run_inference(model, data):
     return model(data)
 
 
-def inference_manual(model, data):
-    sockets = int(subprocess.check_output(
-        'cat /proc/cpuinfo | grep "physical id" | sort -u | wc -l', shell=True))
-    cores_per_socket = psutil.cpu_count(logical=False) / sockets
-
+def inference_manual(model: models.RegNet, data: torch.Tensor, batch_size: int):
     num_threads = int(os.environ.get("OMP_NUM_THREADS"))
-    if num_threads <= cores_per_socket:
-        torch.set_num_threads(num_threads)
-    else:
-        torch.set_num_threads(2**int(math.log(cores_per_socket, 2)))
+    torch.set_num_threads(num_threads)
     torch.set_num_interop_threads(num_threads)
+
+    assert torch.get_num_threads, num_threads
+    assert torch.get_num_interop_threads, num_threads
+
+    # print(torch.__config__.parallel_info())
 
     # open the csv file for writing
     filename = "resnet_benchmark.csv"
     exist = os.path.exists(filename)
     writer = csv.writer(open(filename, "a+"), delimiter=",")
     if not exist:
-        writer.writerow(["threads", "latency"])
+        writer.writerow(["threads", "batch_size", "latency"])
 
     with torch.no_grad():
         for _ in range(100):
             run_inference(model, data)
 
-    # TODO: Use benchmark APIs
-    # https://pytorch.org/tutorials/recipes/recipes/benchmark.html
     start_time = time.time()
     for _ in range(100):
         _output = run_inference(model, data)
@@ -79,7 +72,7 @@ def get_model():
     return model
 
 
-def get_test_data():
+def get_test_data(batch_size: int):
     url, filename = (
         "https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog.jpg")
     try:
@@ -97,22 +90,23 @@ def get_test_data():
     ])
     input_tensor = preprocess(input_image)
     input_batch = input_tensor.unsqueeze(0)
-    return input_batch
+    data = torch.repeat_interleave(input_batch, repeats=batch_size, dim=0)
+    return data
 
 
-def start(r_type):
+def start(r_type, batch_size: int):
     model = get_model()
-    data = get_test_data()
+    data = get_test_data(batch_size)
 
     if r_type == "default":
         inference_benchmark(model, data)
     elif r_type == "manual":
-        inference_manual(model, data)
+        inference_manual(model, data, batch_size)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 1:
-        print("Usage: python3 resnet.py default/manual")
+    if len(sys.argv) < 2:
+        print("Usage: python3 resnet.py default/manual batch_size")
         sys.exit(1)
 
     start(sys.argv[1])

@@ -51,6 +51,11 @@ def run(bench: Benchmark, r_type: RunType):
         set_env(myenv, "OMP_NUM_THREADS", str(threads))
         set_env(myenv, "MKL_NUM_THREADS", str(threads))
 
+        # Static division of work among threads
+        set_env(myenv, "OMP_SCHEDULE", "STATIC")
+        # Schedule the thread near to the parent thread
+        set_env(myenv, "OMP_PROC_BIND", "CLOSE")
+
         if r_type == RunType.manual:
             set_env(myenv, "KMP_AFFINITY",
                     "granularity=fine,proclist={},explicit".format(proclist))
