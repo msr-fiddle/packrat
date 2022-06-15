@@ -44,9 +44,9 @@ def inference_manual(model: models.RegNet, data: torch.Tensor, batch_size: int):
         _output = run_inference(model, data)
     end_time = time.time()
     average_latency = ((end_time - start_time) * 1000) / 100
-    print('Threads {:d}, Time {:.2f} ms'.format(
-        num_threads, average_latency))
-    writer.writerow([num_threads, average_latency])
+    print('Threads {:d}, Batch {}, Time {:.2f} ms'.format(
+        num_threads, batch_size, average_latency))
+    writer.writerow([num_threads, batch_size, average_latency])
 
 
 def inference_benchmark(model, data):
@@ -109,4 +109,4 @@ if __name__ == '__main__':
         print("Usage: python3 resnet.py default/manual batch_size")
         sys.exit(1)
 
-    start(sys.argv[1])
+    start(sys.argv[1], int(sys.argv[2]))

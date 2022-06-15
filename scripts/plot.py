@@ -10,7 +10,7 @@ from plotnine.themes.elements import (element_line, element_rect,
 from plotnine import ggplot
 from plotnine.mapping import aes
 from plotnine.labels import labs
-from plotnine.scales import scale_x_continuous, scale_y_continuous
+from plotnine.scales import scale_x_continuous, scale_y_continuous, scale_color_discrete, scale_y_log10
 from plotnine.geoms import geom_point, geom_line
 
 
@@ -41,12 +41,16 @@ class MyTheme(theme_gray):
 def plot_benchmark_latency(benchmarks):
     "Plots a latency graph for every data-structure in the results file"
 
-    plot = ggplot(data=benchmarks, mapping=aes(x='threads', y='latency', group=1)) + \
+    benchmarks['config'] = benchmarks.apply(
+        lambda row: "Batch={:d}".format(int(row.batch_size)), axis=1)
+
+    plot = ggplot(data=benchmarks, mapping=aes(x='threads', y='latency', color='config')) + \
         MyTheme(base_size=10) + labs(y="Latency [ms]") + \
         theme(legend_position='top', legend_title=element_blank()) + \
         scale_x_continuous(
             breaks=benchmarks['threads'].unique(), labels=["{}".format(thr) for thr in benchmarks['threads'].unique()], name='# Threads') + \
-        scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
+        scale_y_log10(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
+        scale_color_discrete(breaks=benchmarks['config'].unique()) + \
         geom_point() + \
         geom_line()
 
@@ -57,13 +61,17 @@ def plot_benchmark_throughputs(benchmarks):
     "Plots a throughput graph for every data-structure in the results file"
     # Fail if we have more than one experiment duration
 
-    plot = ggplot(data=benchmarks, mapping=aes(x='threads', y='throughput')) + \
+    benchmarks['config'] = benchmarks.apply(
+        lambda row: "Batch={:d}".format(int(row.batch_size)), axis=1)
+
+    plot = ggplot(data=benchmarks, mapping=aes(x='threads', y='throughput', color='config')) + \
         MyTheme(base_size=10) + \
-        labs(y="Throughput []") + \
+        labs(y="Throughput [ops]") + \
         theme(legend_position='top', legend_title=element_blank()) + \
         scale_x_continuous(
             breaks=benchmarks['threads'].unique(), labels=["{}".format(thr) for thr in benchmarks['threads'].unique()], name='# Threads') + \
         scale_y_continuous(labels=lambda lst: ["{:,}".format(x) for x in lst]) + \
+        scale_color_discrete(breaks=benchmarks['config'].unique()) + \
         geom_point() + \
         geom_line()
 

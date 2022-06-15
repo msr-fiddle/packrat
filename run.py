@@ -36,7 +36,7 @@ def set_env(env, env_name: str, env_value: str):
     env[env_name] = env_value
 
 
-def run(bench: Benchmark, r_type: RunType):
+def run(bench: Benchmark, r_type: RunType, batch_size: int):
     """
     Main function
     """
@@ -51,36 +51,39 @@ def run(bench: Benchmark, r_type: RunType):
         set_env(myenv, "OMP_NUM_THREADS", str(threads))
         set_env(myenv, "MKL_NUM_THREADS", str(threads))
 
-        # Static division of work among threads
-        set_env(myenv, "OMP_SCHEDULE", "STATIC")
-        # Schedule the thread near to the parent thread
-        set_env(myenv, "OMP_PROC_BIND", "CLOSE")
-
         if r_type == RunType.manual:
+            # Static division of work among threads
+            set_env(myenv, "OMP_SCHEDULE", "STATIC")
+            # Schedule the thread near to the parent thread
+            set_env(myenv, "OMP_PROC_BIND", "CLOSE")
             set_env(myenv, "KMP_AFFINITY",
                     "granularity=fine,proclist={},explicit".format(proclist))
 
             cmd = [
                 "numactl", "-C {}".format(",".join(str(x) for x in proclist)),
                 "python", "./benchmarks/{}.py".format(bench.name),
-                "{}".format(r_type.name)
+                "{}".format(r_type.name),
+                "{}".format(batch_size)
             ]
         elif r_type == RunType.default:
             cmd = [
                 "python", "./benchmarks/{}.py".format(bench.name),
-                "{}".format(r_type.name)
+                "{}".format(r_type.name),
+                "{}".format(batch_size)
             ]
         ret = subprocess.check_call(cmd, env=myenv)
         assert ret == 0
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print("Error: Too few arguments")
-        print("Usage: {0} [benchmark] [default/manual]".format(sys.argv[0]))
+        print(
+            "Usage: {0} [benchmark] [default/manual] [batch_size]".format(sys.argv[0]))
         sys.exit(1)
 
     BENCH = Benchmark[sys.argv[1]]
     TYPE = RunType[sys.argv[2]]
+    batch_size = sys.argv[3]
 
-    run(BENCH, TYPE)
+    run(BENCH, TYPE, batch_size)
