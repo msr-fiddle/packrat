@@ -89,9 +89,12 @@ def get_test_data(batch_size: int):
                              std=[0.229, 0.224, 0.225]),
     ])
     input_tensor = preprocess(input_image)
-    input_batch = input_tensor.unsqueeze(0)
-    data = torch.repeat_interleave(input_batch, repeats=batch_size, dim=0)
-    return data
+    input_batch = []
+    for i in range(0, batch_size, 1):
+        input_batch.append(input_tensor)
+
+    data = torch.stack(input_batch)
+    return data.to_mkldnn()
 
 
 def start(r_type, batch_size: int):
