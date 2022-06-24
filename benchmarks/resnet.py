@@ -21,6 +21,9 @@ class ResnetBench(implements(Bench)):
         model = self.get_model()
         data = self.get_test_data(config.batch_size)
 
+        model, data = self.optimize_memory_layout(
+            config.optimization, model, data)
+
         if config.run_type == RunType.default:
             self.inference_benchmark(config, model, data)
         elif config.run_type == RunType.manual:

@@ -5,7 +5,7 @@ import os
 import csv
 import logging
 
-from config import Config
+from config import Config, Optimizations
 
 
 class Bench(Interface):
@@ -24,8 +24,26 @@ class Bench(Interface):
         pass
 
     @interface.default
+    def optimize_memory_layout(self, optimization: Optimizations, model: torch.nn.Module, data: torch.Tensor):
+        if optimization == Optimizations.none:
+            return model, data
+        elif optimization == Optimizations.channels_last:
+            return model.to(memory_format=torch.channels_last), data.to(memory_format=torch.channels_last)
+        elif optimization == Optimizations.mkldnn:
+            from torch.utils import mkldnn
+            return mkldnn.to_mkldnn(model), data.to_mkldnn()
+        elif optimization == Optimizations.ipex:
+            import intel_extension_for_pytorch as ipex
+            model = model.to(memory_format=torch.channels_last)
+            model = ipex.optimize(model)
+            data = data.to(memory_format=torch.channels_last)
+            return model, data
+
+    @interface.default
     def report(self, config: Config) -> None:
         num_threads = len(config.core_list)
+        benchmark = config.benchmark.name + '_' + \
+            config.run_type.name + '_' + config.optimization.name
 
         def report_latency():
             if len(self.latencies) > 0:
@@ -35,14 +53,14 @@ class Bench(Interface):
                 writer = csv.writer(open(filename, "a+"), delimiter=",")
                 if not exists:
                     writer.writerow(
-                        ["threads", "batch_size", "latency(min), latency(avg), latency(max)"])
+                        ["benchmark", "threads", "batch_size", "latency(min)", "latency(avg)", "latency(max)"])
                 min, max, avg = self.latencies[0] * 1000,  (sum(self.latencies) / len(
                     self.latencies)) * 1000, self.latencies[-1] * 1000
-                writer.writerow([num_threads, config.batch_size,
-                                self.latencies[0], min, max, avg])
+                writer.writerow(
+                    [benchmark, num_threads, config.batch_size, min, max, avg])
 
-                logging.debug("Threads: {}, BatchSize {}, Latencyies: Min {:.2f}, Average  {:.2f}, Max {:.2f} ".format(
-                    num_threads, config.batch_size, min, max, avg))
+                logging.debug("Benchmark: {}, Threads: {}, BatchSize: {}, Latencyies: Min {: .2f}, Average  {: .2f}, Max {: .2f} ".format(
+                    benchmark, num_threads, config.batch_size, min, max, avg))
 
         def report_throughput():
             if len(self.latencies) > 0:
@@ -51,12 +69,13 @@ class Bench(Interface):
                 writer = csv.writer(open(filename, "a+"), delimiter=",")
                 if not exists:
                     writer.writerow(
-                        ["threads", "batch_size", "throughput"])
-                throughput = len(self.latencies) / sum(self.latencies)
+                        ["benchmark", "threads", "batch_size", "throughput"])
+                throughput = (config.batch_size *
+                              config.iterations) / sum(self.latencies)
                 writer.writerow(
-                    [num_threads, config.batch_size, throughput])
-                logging.debug("Threads: {}, BatchSize {}, Throughput: {} ".format(
-                              num_threads, config.batch_size, throughput))
+                    [benchmark, num_threads, config.batch_size, throughput])
+                logging.debug("Benchmark: {}, Threads: {}, BatchSize: {}, Throughput: {} ".format(
+                              benchmark, num_threads, config.batch_size, throughput))
 
         report_latency()
         report_throughput()

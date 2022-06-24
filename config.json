@@ -1,6 +1,7 @@
 {
     "benchmark": "resnet",
     "run_type": "manual",
+    "optimization": "none",
     "batch_size": 1,
     "iterations": 100,
     "core_list": []
