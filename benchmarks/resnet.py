@@ -3,9 +3,8 @@ This benchmark is an extension to the benchmark explained at
 https://pytorch.org/hub/pytorch_vision_resnet/
 """
 
-import csv
 import os
-import time
+import timeit
 import urllib
 from PIL import Image
 import torch
@@ -31,6 +30,11 @@ class ResnetBench(implements(Bench)):
         model = models.resnet50(pretrained=True)
         model.eval()
         return model
+
+    def warmup(self, model, data):
+        with torch.no_grad():
+            timeit.Timer(lambda: self.run_inference(
+                model, data)).timeit(number=10)
 
     def get_test_data(self, batch_size: int) -> torch.Tensor:
         url, filename = (
@@ -68,26 +72,11 @@ class ResnetBench(implements(Bench)):
         assert torch.get_num_interop_threads, num_threads
 
         # print(torch.__config__.parallel_info())
+        self.warmup(model, data)
 
-        # open the csv file for writing
-        filename = "resnet_benchmark.csv"
-        exist = os.path.exists(filename)
-        writer = csv.writer(open(filename, "a+"), delimiter=",")
-        if not exist:
-            writer.writerow(["threads", "batch_size", "latency"])
-
-        with torch.no_grad():
-            for _ in range(config.iterations):
-                _a = self.run_inference(model, data)
-
-        start_time = time.time()
-        for _ in range(config.iterations):
-            _output = self.run_inference(model, data)
-        end_time = time.time()
-        average_latency = ((end_time - start_time) * 1000) / config.iterations
-        print('Threads {:d}, Batch {}, Time {:.2f} ms'.format(
-            num_threads, config.batch_size, average_latency))
-        writer.writerow([num_threads, config.batch_size, average_latency])
+        for index in range(config.iterations):
+            self.latencies[index] = timeit.Timer(
+                lambda: self.run_inference(model, data)).timeit(number=1)
 
     def inference_benchmark(self, model, data):
         import torch.utils.benchmark as benchmark
@@ -107,4 +96,8 @@ class ResnetBench(implements(Bench)):
 
 
 if __name__ == "__main__":
-    ResnetBench().run(Config())
+    bench = ResnetBench()
+    config = Config()
+    bench.latencies = [None] * (config.iterations)
+    bench.run(config)
+    bench.report(config)

@@ -41,6 +41,16 @@ class Config:
             self.core_list = self.data['core_list']
             json_file.close()
 
+    def reinitialize(self) -> None:
+        self.data = {
+            'benchmark': self.benchmark.resnet.name,
+            'run_type': self.run_type.manual.name,
+            'batch_size': 1,
+            'iterations': 100,
+            'core_list': []
+        }
+        self.update()
+
     def set_core_list(self, value: list) -> None:
         self.data['core_list'] = value
 

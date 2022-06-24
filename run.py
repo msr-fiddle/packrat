@@ -67,4 +67,6 @@ def run(config: Config):
 
 
 if __name__ == '__main__':
-    run(Config())
+    config = Config()
+    config.reinitialize()
+    run(config)
