@@ -36,8 +36,8 @@ class Bench(Interface):
                 if not exists:
                     writer.writerow(
                         ["threads", "batch_size", "latency(min), latency(avg), latency(max)"])
-                min, max, avg = self.latencies[0] * 1000, self.latencies[-1] * 1000, (sum(
-                    self.latencies) / len(self.latencies)) * 1000
+                min, max, avg = self.latencies[0] * 1000,  (sum(self.latencies) / len(
+                    self.latencies)) * 1000, self.latencies[-1] * 1000
                 writer.writerow([num_threads, config.batch_size,
                                 self.latencies[0], min, max, avg])
 
