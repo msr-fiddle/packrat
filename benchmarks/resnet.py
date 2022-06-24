@@ -14,14 +14,11 @@ from torchvision import transforms
 from interface import implements
 
 from bench import Bench
-import config as cfg
 from config import Config, RunType
 
 
 class ResnetBench(implements(Bench)):
-    def run(self) -> None:
-        config = cfg.cur_config
-        print(f"Running on cores {config.core_list}")
+    def run(self, config: Config) -> None:
         model = self.get_model()
         data = self.get_test_data(config.batch_size)
 
@@ -80,14 +77,14 @@ class ResnetBench(implements(Bench)):
             writer.writerow(["threads", "batch_size", "latency"])
 
         with torch.no_grad():
-            for _ in range(100):
+            for _ in range(config.iterations):
                 _a = self.run_inference(model, data)
 
         start_time = time.time()
-        for _ in range(100):
+        for _ in range(config.iterations):
             _output = self.run_inference(model, data)
         end_time = time.time()
-        average_latency = ((end_time - start_time) * 1000) / 100
+        average_latency = ((end_time - start_time) * 1000) / config.iterations
         print('Threads {:d}, Batch {}, Time {:.2f} ms'.format(
             num_threads, config.batch_size, average_latency))
         writer.writerow([num_threads, config.batch_size, average_latency])
@@ -110,4 +107,4 @@ class ResnetBench(implements(Bench)):
 
 
 if __name__ == "__main__":
-    ResnetBench().run()
+    ResnetBench().run(Config())

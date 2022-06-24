@@ -1,4 +1,5 @@
 from enum import Enum
+import json
 
 
 class Benchmark(Enum):
@@ -29,23 +30,23 @@ class Config:
     """
     Common configurations
     """
-    benchmark: Benchmark
-    run_type: RunType
-    batch_size: int
-    core_list: list
 
     def __init__(self):
-        """
-        Constructor
-        """
-        self.benchmark = Benchmark.resnet
-        self.run_type = RunType.manual
-        self.batch_size = 1
-        self.core_list = []
+        with open('config.json', 'r') as json_file:
+            self.data = json.load(json_file)
+            self.benchmark = Benchmark[self.data['benchmark']]
+            self.run_type = RunType[self.data['run_type']]
+            self.batch_size = int(self.data['batch_size'])
+            self.iterations = int(self.data['iterations'])
+            self.core_list = self.data['core_list']
+            json_file.close()
 
-    def __setattr__(self, name, value):
-        super(Config, self).__setattr__(name, value)
+    def set_core_list(self, value: list) -> None:
+        self.data['core_list'] = value
 
+    def set_batch_size(self, value: int) -> None:
+        self.data['batch_size'] = value
 
-global cur_config
-cur_config = Config()
+    def update(self) -> None:
+        with open('config.json', 'w') as outfile:
+            json.dump(self.data, outfile, indent=4)

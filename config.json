@@ -1,0 +1,7 @@
+{
+    "benchmark": "resnet",
+    "run_type": "manual",
+    "batch_size": 1,
+    "iterations": 100,
+    "core_list": []
+}
