@@ -1,0 +1,7 @@
+title: PyTorch benchmarks
+baseurl: "/numa-aware-frameworks/"
+url: "https://msr-fiddle.github.io/numa-aware-frameworks/"
+github_username: msr-fiddle
+
+# Build settings
+markdown: kramdown

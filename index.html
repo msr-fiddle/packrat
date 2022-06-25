@@ -1,0 +1,21 @@
+---
+layout: default
+---
+
+<div class="home">
+
+  <h1 class="page-heading">Benchmarks Skylake (2 socket)</h1>
+
+  <ul class="post-list">
+    {% for post in site.data.skylake2x %}
+    <li>
+      <h2>
+        {{ post.date }} {{ post.revision }}<br>
+        {% if post.benchpath %}
+        <a href="{{ site.baseurl }}resnet/skylake2x/{{ post.revision }}/{{ post.benchpath }}">ResNet50</a>
+        {% endif %}
+      </h2>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
