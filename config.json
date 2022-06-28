@@ -4,5 +4,7 @@
     "optimization": "none",
     "batch_size": 1,
     "iterations": 100,
+    "interop_threads": 1,
+    "intraop_threads": 1,
     "core_list": []
 }

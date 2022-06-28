@@ -43,6 +43,8 @@ class Config:
             self.optimization = Optimizations[self.data['optimization']]
             self.batch_size = int(self.data['batch_size'])
             self.iterations = int(self.data['iterations'])
+            self.interop_threads = int(self.data['interop_threads'])
+            self.intraop_threads = int(self.data['intraop_threads'])
             self.core_list = self.data['core_list']
             json_file.close()
 
@@ -53,6 +55,8 @@ class Config:
             'optimization': Optimizations.none.name,
             'batch_size': 1,
             'iterations': 100,
+            'interop_threads': 1,
+            'intraop_threads': 1,
             'core_list': []
         }
         self.update()
@@ -65,6 +69,12 @@ class Config:
 
     def set_batch_size(self, value: int) -> None:
         self.data['batch_size'] = value
+
+    def set_interop_threads(self, value: int) -> None:
+        self.data['interop_threads'] = value
+
+    def set_intraop_threads(self, value: int) -> None:
+        self.data['intraop_threads'] = value
 
     def update(self) -> None:
         with open('config.json', 'w') as outfile:
