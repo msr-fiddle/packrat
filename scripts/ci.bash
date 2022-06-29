@@ -10,7 +10,6 @@ eval `keychain --agents ssh --eval id_rsa_ankit`
 CI_MACHINE_TYPE=skylake2x
 export GIT_REV_CURRENT=`git rev-parse --short HEAD`
 export CSV_LINE="`date +%Y-%m-%d`",${GIT_REV_CURRENT},"","index.html"
-echo $CSV_LINE >> gh-pages/_data/${CI_MACHINE_TYPE}.csv
 
 # Check that we can checkout gh-pages early:
 rm -rf gh-pages
@@ -22,6 +21,7 @@ python3 scripts/plot.py latency resnet_latency.csv
 python3 scripts/plot.py throughput resnet_throughput.csv
 
 # Copy the data and graphs to the gh-pages repo
+echo $CSV_LINE >> gh-pages/_data/${CI_MACHINE_TYPE}.csv
 RESNET_DEPLOY="gh-pages/resnet/${CI_MACHINE_TYPE}/${GIT_REV_CURRENT}"
 rm -rf ${RESNET_DEPLOY}
 mkdir -p ${RESNET_DEPLOY}
