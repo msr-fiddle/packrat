@@ -1,5 +1,5 @@
+from argparse import Namespace
 from enum import Enum
-import json
 
 
 class Benchmark(Enum):
@@ -23,8 +23,8 @@ class Optimizations(Enum):
     """
     none = 1
     channels_last = 2
-    mkldnn = 2
-    ipex = 3
+    mkldnn = 3
+    ipex = 4
 
 
 class Config:
@@ -32,52 +32,49 @@ class Config:
     Common configurations
     """
 
-    def __init__(self):
-        self.read()
+    def __init__(self, args: None):
+        if args is not(None):
+            self.benchmark = Benchmark[args.benchmark]
+            self.run_type = RunType[args.run_type]
+            self.optimization = Optimizations[args.optimization]
+            self.batch_size = int(args.batch_size)
+            self.iterations = int(args.iterations)
+            self.interop_threads = int(args.interop_threads)
+            self.intraop_threads = int(args.intraop_threads)
+            self.core_list = args.core_list
+        else:
+            self.benchmark = Benchmark.resnet
+            self.run_type = RunType.manual
+            self.optimization = Optimizations.none
+            self.batch_size = 1
+            self.iterations = 100
+            self.interop_threads = 1
+            self.intraop_threads = 1
+            self.core_list = [0]
 
-    def read(self):
-        with open('config.json', 'r') as json_file:
-            self.data = json.load(json_file)
-            self.benchmark = Benchmark[self.data['benchmark']]
-            self.run_type = RunType[self.data['run_type']]
-            self.optimization = Optimizations[self.data['optimization']]
-            self.batch_size = int(self.data['batch_size'])
-            self.iterations = int(self.data['iterations'])
-            self.interop_threads = int(self.data['interop_threads'])
-            self.intraop_threads = int(self.data['intraop_threads'])
-            self.core_list = self.data['core_list']
-            json_file.close()
+    def __repr__(self):
+        return 'benchmark={}, run_type={}, optimization={}, batch_size={}, iterations={}, interop_threads={}, intraop_threads={}, core_list={}'.format(self.benchmark.name, self.run_type.name, self.optimization.name, self.batch_size, self.iterations, self.interop_threads, self.intraop_threads, self.core_list)
 
-    def reinitialize(self) -> None:
-        self.data = {
-            'benchmark': self.benchmark.resnet.name,
-            'run_type': self.run_type.manual.name,
-            'optimization': Optimizations.none.name,
-            'batch_size': 1,
-            'iterations': 100,
-            'interop_threads': 1,
-            'intraop_threads': 1,
-            'core_list': []
-        }
-        self.update()
+    @classmethod
+    def from_string(self, string: str):
+        """
+        Convert a string to a Config
+        """
+        import re
+        args = re.split(', |=', string)
+        return self(Namespace(benchmark=args[1], run_type=args[3], optimization=args[5], batch_size=args[7], iterations=args[9], interop_threads=args[11], intraop_threads=args[13], core_list=args[15]))
 
     def set_optimization(self, value: Optimizations) -> None:
-        self.data['optimization'] = value.name
+        self.optimization = value
 
     def set_core_list(self, value: list) -> None:
-        self.data['core_list'] = value
+        self.core_list = value
 
     def set_batch_size(self, value: int) -> None:
-        self.data['batch_size'] = value
+        self.batch_size = value
 
     def set_interop_threads(self, value: int) -> None:
-        self.data['interop_threads'] = value
+        self.interop_threads = value
 
     def set_intraop_threads(self, value: int) -> None:
-        self.data['intraop_threads'] = value
-
-    def update(self) -> None:
-        with open('config.json', 'w') as outfile:
-            outfile.write(json.dumps(self.data, indent=4))
-            outfile.close()
-        self.read()
+        self.intraop_threads = value

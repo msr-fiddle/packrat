@@ -4,6 +4,7 @@ https://pytorch.org/hub/pytorch_vision_resnet/
 """
 
 import os
+from sys import argv
 import timeit
 import urllib
 from PIL import Image
@@ -67,12 +68,11 @@ class ResnetBench(implements(Bench)):
         return model(data)
 
     def inference_manual(self, config: Config, model: torch.nn.Module, data: torch.Tensor):
-        num_threads = int(os.environ.get("OMP_NUM_THREADS"))
-        torch.set_num_threads(num_threads)
-        torch.set_num_interop_threads(num_threads)
+        torch.set_num_threads(config.intraop_threads)
+        torch.set_num_interop_threads(config.interop_threads)
 
-        assert torch.get_num_threads, num_threads
-        assert torch.get_num_interop_threads, num_threads
+        assert torch.get_num_threads, config.intraop_threads
+        assert torch.get_num_interop_threads, config.interop_threads
 
         # print(torch.__config__.parallel_info())
         self.warmup(model, data)
@@ -99,8 +99,12 @@ class ResnetBench(implements(Bench)):
 
 
 if __name__ == "__main__":
+    if len(argv) == 2:
+        config = Config(argv[1])
+    else:
+        config = Config(None)
+    print(config)
     bench = ResnetBench()
-    config = Config()
     bench.latencies = [None] * (config.iterations)
     bench.run(config)
     bench.report(config)
