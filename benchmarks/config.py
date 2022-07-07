@@ -23,9 +23,10 @@ class Optimizations(Enum):
     Enum for the optimizations
     """
     none = 1
-    channels_last = 2
-    mkldnn = 3
-    ipex = 4
+    script = 2
+    channels_last = 3
+    mkldnn = 4
+    ipex = 5
 
 
 class Config:

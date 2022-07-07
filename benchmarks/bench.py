@@ -27,6 +27,10 @@ class Bench(Interface):
     def optimize_memory_layout(self, optimization: Optimizations, model: torch.nn.Module, data: torch.Tensor):
         if optimization == Optimizations.none:
             return model, data
+        elif optimization == Optimizations.script:
+            model = torch.jit.script(model)
+            model = torch.jit.optimize_for_inference(model)
+            return model, data
         elif optimization == Optimizations.channels_last:
             return model.to(memory_format=torch.channels_last), data.to(memory_format=torch.channels_last)
         elif optimization == Optimizations.mkldnn:
