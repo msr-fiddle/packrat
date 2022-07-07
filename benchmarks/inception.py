@@ -1,8 +1,3 @@
-"""
-This benchmark is an extension to the benchmark explained at
-https://pytorch.org/hub/pytorch_vision_resnet/
-"""
-
 import os
 from sys import argv
 import timeit
@@ -17,7 +12,7 @@ from bench import Bench
 from config import Benchmark, Config, RunType
 
 
-class ResnetBench(implements(Bench)):
+class InceptionBench(implements(Bench)):
     def run(self, config: Config) -> None:
         model = self.get_model()
         data = self.get_test_data(config.batch_size)
@@ -31,7 +26,7 @@ class ResnetBench(implements(Bench)):
             self.inference_manual(config, model, data)
 
     def get_model(self) -> torch.nn.Module:
-        model = models.resnet50(pretrained=True)
+        model = models.inception_v3(pretrained=True)
         model.eval()
         return model
 
@@ -75,6 +70,7 @@ class ResnetBench(implements(Bench)):
         assert torch.get_num_interop_threads, config.interop_threads
 
         # print(torch.__config__.parallel_info())
+        model = torch.jit.trace(model, data)
         self.warmup(model, data)
 
         for index in range(config.iterations):
@@ -103,8 +99,8 @@ if __name__ == "__main__":
         config = Config(None).from_string(argv[1])
     else:
         config = Config(None)
-        config.benchmark = Benchmark.resnet
-    bench = ResnetBench()
+        config.benchmark = Benchmark.inception
+    bench = InceptionBench()
     bench.latencies = [None] * (config.iterations)
     bench.run(config)
     bench.report(config)

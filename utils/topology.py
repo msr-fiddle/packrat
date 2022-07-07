@@ -65,29 +65,28 @@ class CPUInfo():
         return {int(node) for cpu, core, node in self.cpuinfo}
 
 
-def allocate_cores(mapping: str, threads: int, hyper_threading: bool = False):
-    """
-    Allocate the number of cores on the node
-    """
+    def allocate_cores(self, mapping: str, threads: int, hyper_threading: bool = False):
+        """
+        Allocate the number of cores on the node
+        """
 
-    info = CPUInfo()
-    sockets = info.get_sockets()
-    cores = []
+        sockets = self.get_sockets()
+        cores = []
 
-    for socket in sockets:
-        hts = []
-        if hyper_threading:
-            hts = info.get_threads_on_node(str(socket))
-        else:
-            hts = info.get_cores_on_node(str(socket))
+        for socket in sockets:
+            hts = []
+            if hyper_threading:
+                hts = self.get_threads_on_node(str(socket))
+            else:
+                hts = self.get_cores_on_node(str(socket))
 
-        for thread in hts:
-            cores.append(thread)
+            for thread in hts:
+                cores.append(thread)
 
-    if mapping == "machine":
-        cores.sort()
+        if mapping == "machine":
+            cores.sort()
 
-    return cores[0:threads]
+        return cores[0:threads]
 
 
 def main():

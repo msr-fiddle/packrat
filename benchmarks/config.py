@@ -7,6 +7,7 @@ class Benchmark(Enum):
     Enum for the benchmark
     """
     resnet = 1
+    inception = 2
 
 
 class RunType(Enum):

@@ -11,9 +11,10 @@ import os
 import subprocess
 from argparse import ArgumentParser, Namespace
 import psutil
-from utils import topology
+from utils.topology import CPUInfo
 
 from benchmarks.config import Benchmark, Optimizations, RunType, Config
+
 
 def parse_args():
     args = ArgumentParser(description="Run the benchmark")
@@ -62,10 +63,11 @@ def run_with_parameters(config: Config):
 
         cmd = [
             "numactl", "-C {}".format(",".join(str(x)
-                                               for x in proclist))
+                                               for x in proclist)),
+            "python3"
         ]
 
-    cmd.append(f"python3 ./benchmarks/{config.benchmark.name}.py")
+    cmd.append(f"./benchmarks/{config.benchmark.name}.py")
     cmd.append(repr(config))
     logging.info("Running: %s", " ".join(cmd))
     ret = subprocess.check_call(cmd, env=myenv)
@@ -78,11 +80,13 @@ def run(args: Namespace):
     """
     config = Config(args)
 
-    core_count = psutil.cpu_count(logical=False)
+    topology = CPUInfo()
+    core_count = int(psutil.cpu_count(logical=False) /
+                     len(topology.get_sockets()))
     for batch_size in [1, 8, 16, 32]:
-        for interop in range(1, core_count + 1):
-            for intraop in [1]:
-                proclist = topology.allocate_cores("socket", interop)
+        for interop in [1]:
+            for intraop in range(1, core_count + 1):
+                proclist = topology.allocate_cores("socket", intraop)
 
                 # Set the configuration
                 config.set_core_list(proclist)
