@@ -8,6 +8,7 @@ class Benchmark(Enum):
     """
     resnet = 1
     inception = 2
+    gpt2 = 3
 
 
 class RunType(Enum):

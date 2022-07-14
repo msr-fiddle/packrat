@@ -28,8 +28,9 @@ install_vtune() {
 }
 
 install_torch() {
-    pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
     python3 -m pip install psutil
+    pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+    pip3 install transformers python-interface
     pip3 install pandas plotnine
 }
 

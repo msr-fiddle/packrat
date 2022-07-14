@@ -1,18 +1,17 @@
+# https://huggingface.co/transformers/v1.0.0/quickstart.html
+
 import os
 from sys import argv
 import timeit
-import urllib
-from PIL import Image
 import torch
-import torchvision.models as models
-from torchvision import transforms
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from interface import implements
 
 from bench import Bench
 from config import Benchmark, Config, RunType
 
 
-class InceptionBench(implements(Bench)):
+class GptBench(implements(Bench)):
     def run(self, config: Config) -> None:
         model = self.get_model()
         data = self.get_test_data(config.batch_size)
@@ -26,7 +25,7 @@ class InceptionBench(implements(Bench)):
             self.inference_manual(config, model, data)
 
     def get_model(self) -> torch.nn.Module:
-        model = models.inception_v3(pretrained=True)
+        model = GPT2LMHeadModel.from_pretrained('gpt2')
         model.eval()
         return model
 
@@ -36,22 +35,11 @@ class InceptionBench(implements(Bench)):
                 model, data)).timeit(number=10)
 
     def get_test_data(self, batch_size: int) -> torch.Tensor:
-        url, filename = (
-            "https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog.jpg")
-        try:
-            urllib.request.urlretrieve(url, filename)
-        except urllib.error.HTTPError:
-            urllib.request.urlretrieve(url, filename)
-        input_image = Image.open(filename)
+        text = "Who was Jim Henson ? Jim Henson was a"
+        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        indexed_tokens = tokenizer.encode(text)
+        input_tensor = torch.tensor([indexed_tokens])
 
-        preprocess = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225]),
-        ])
-        input_tensor = preprocess(input_image)
         input_batch = []
         for i in range(0, batch_size, 1):
             input_batch.append(input_tensor)
@@ -99,7 +87,7 @@ if __name__ == "__main__":
     else:
         config = Config(None)
         config.benchmark = Benchmark.inception
-    bench = InceptionBench()
+    bench = GptBench()
     bench.latencies = [None] * (config.iterations)
     bench.run(config)
     bench.report(config)
