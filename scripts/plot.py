@@ -12,7 +12,7 @@ from plotnine import ggplot
 from plotnine.labels import ggtitle
 from plotnine.mapping import aes
 from plotnine.labels import labs
-from plotnine.scales import scale_x_continuous, scale_y_continuous, scale_color_discrete, scale_y_log10, scale_fill_gradientn 
+from plotnine.scales import scale_x_continuous, scale_y_continuous, scale_color_discrete, scale_fill_gradientn
 from plotnine.geoms import geom_point, geom_line, geom_tile, geom_text
 
 
@@ -50,18 +50,21 @@ def plot_benchmark_latency_per_batch(benchmarks):
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "opt={}".format(opt))
+            benchmark['change'] = (
+                benchmark['latency(avg)'].pct_change() * 100).round(1)
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
-        plot = ggplot(data=data, mapping=aes(x='threads', y='latency(avg)', color='config')) + \
-            MyTheme(base_size=10) + labs(y="Latency [ms]") + \
+        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='latency(avg)', color='config')) + \
+            MyTheme(base_size=10) + labs(y="Latency per batch [ms]") + \
             theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
             ggtitle("Threads vs Latency (BS={})".format(batch_size)) + \
             scale_x_continuous(
-                breaks=data['threads'].unique(), labels=["{}".format(thr) for thr in data['threads'].unique()], name='# threads') + \
-            scale_y_log10(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
+                breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
+            scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
             scale_color_discrete(breaks=data['config'].unique()) + \
             geom_point() + \
+            geom_text(aes(label='change'), size=13, ha="left", va="bottom") + \
             geom_line()
 
         plot.save("resnet-latency-{}.png".format(batch_size), dpi=300,
@@ -78,16 +81,18 @@ def plot_benchmark_latency_per_opt(benchmarks):
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
+            benchmark['change'] = (
+                benchmark['latency(avg)'].pct_change() * 100).round(1)
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
-        plot = ggplot(data=data, mapping=aes(x='threads', y='latency(avg)', color='config')) + \
-            MyTheme(base_size=10) + labs(y="Latency [ms]") + \
+        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='latency(avg)', color='config')) + \
+            MyTheme(base_size=10) + labs(y="Latency per batch [ms]") + \
             theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
             ggtitle("Threads vs Latency (Opt={})".format(opt.upper())) + \
             scale_x_continuous(
-                breaks=data['threads'].unique(), labels=["{}".format(thr) for thr in data['threads'].unique()], name='# threads') + \
-            scale_y_log10(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
+                breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
+            scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
             scale_color_discrete(breaks=data['config'].unique()) + \
             geom_point() + \
             geom_line()
@@ -106,19 +111,22 @@ def plot_benchmark_throughputs_per_batch(benchmarks):
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "opt={}".format(opt))
+            benchmark['change'] = (
+                benchmark['throughput'].pct_change() * 100).round(1)
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
-        plot = ggplot(data=data, mapping=aes(x='threads', y='throughput', color='config')) + \
+        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='throughput', color='config')) + \
             MyTheme(base_size=10) + \
-            labs(y="throughput [ops]") + \
+            labs(y="throughput [inferences/sec]") + \
             theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
             ggtitle("Threads vs Throughput (BS={})".format(batch_size)) + \
             scale_x_continuous(
-                breaks=data['threads'].unique(), labels=["{}".format(thr) for thr in data['threads'].unique()], name='# threads') + \
+                breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
             scale_y_continuous(labels=lambda lst: ["{:,}".format(x) for x in lst]) + \
             scale_color_discrete(breaks=data['config'].unique()) + \
             geom_point() + \
+            geom_text(aes(label='change'), size=13, ha="left", va="bottom") + \
             geom_line()
 
         plot.save("resnet-throughput-{}.png".format(batch_size), dpi=300,
@@ -135,16 +143,18 @@ def plot_benchmark_throughputs_per_opt(benchmarks):
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
+            benchmark['change'] = (
+                benchmark['throughput'].pct_change() * 100).round(1)
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
-        plot = ggplot(data=data, mapping=aes(x='threads', y='throughput', color='config')) + \
+        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='throughput', color='config')) + \
             MyTheme(base_size=10) + \
-            labs(y="throughput [ops]") + \
+            labs(y="throughput [inferences/sec]") + \
             theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
             ggtitle("Threads vs Throughput (Opt={})".format(opt.upper())) + \
             scale_x_continuous(
-                breaks=data['threads'].unique(), labels=["{}".format(thr) for thr in data['threads'].unique()], name='# threads') + \
+                breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
             scale_y_continuous(labels=lambda lst: ["{:,}".format(x) for x in lst]) + \
             scale_color_discrete(breaks=data['config'].unique()) + \
             geom_point() + \
@@ -174,7 +184,8 @@ def plot_latency_heatmap(benchmarks):
                   panel_background=element_rect(fill="white"),
                   panel_grid_major=element_line(colour="white"),
                   strip_background=element_rect(colour="orange", fill="orange")) + \
-            scale_fill_gradientn(colors=["#0080FF", "#00FFFF", "#00FF80", "#FFFF00", "#FF8000", "#FF0000", "#800000"])
+            scale_fill_gradientn(colors=[
+                                 "#0080FF", "#00FFFF", "#00FF80", "#FFFF00", "#FF8000", "#FF0000", "#800000"])
 
         p.save('latency_heatmap_{}.png'.format(batch_size), dpi=300)
 
@@ -199,24 +210,22 @@ def plot_throughput_heatmap(benchmarks):
                   panel_background=element_rect(fill="white"),
                   panel_grid_major=element_line(colour="white"),
                   strip_background=element_rect(colour="orange", fill="orange")) + \
-            scale_fill_gradientn(colors=["#0080FF", "#00FFFF", "#00FF80", "#FFFF00", "#FF8000", "#FF0000", "#800000"])
+            scale_fill_gradientn(colors=[
+                                 "#0080FF", "#00FFFF", "#00FF80", "#FFFF00", "#FF8000", "#FF0000", "#800000"])
 
         p.save('throughput_heatmap_{}.png'.format(batch_size), dpi=300)
 
+
 def plot_latency(df):
-    if 'interop_threads' in df.columns.to_list() or 'intraop_threads' in df.columns.to_list():
-        plot_latency_heatmap(df)
-    else:
-        plot_benchmark_latency_per_batch(df)
-        plot_benchmark_latency_per_opt(df)
+    plot_latency_heatmap(df)
+    plot_benchmark_latency_per_batch(df)
+    plot_benchmark_latency_per_opt(df)
 
 
 def plot_throughput(df):
-    if 'interop_threads' in df.columns.to_list() or 'intraop_threads' in df.columns.to_list():
-        plot_throughput_heatmap(df)
-    else:
-        plot_benchmark_throughputs_per_batch(df)
-        plot_benchmark_throughputs_per_opt(df)
+    plot_throughput_heatmap(df)
+    plot_benchmark_throughputs_per_batch(df)
+    plot_benchmark_throughputs_per_opt(df)
 
 
 if __name__ == '__main__':
