@@ -32,3 +32,9 @@ title:  "ResNet50"
 <img src="./resnet-throughput-none.png" alt="ResNet Latency Opt=None" width="100%"/>
 <img src="./resnet-throughput-script.png" alt="ResNet Latency Opt=Script" width="100%"/>
 </p>
+
+## Speedup
+<p float="left">
+<img src="./resnet-throughput-speedup-none.png" alt="ResNet Latency Opt=None" width="100%"/>
+<img src="./resnet-throughput-speedup-script.png" alt="ResNet Latency Opt=Script" width="100%"/>
+</p>

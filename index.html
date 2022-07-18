@@ -11,8 +11,14 @@ layout: default
     <li>
       <h2>
         {{ post.date }} {{ post.revision }}<br>
-        {% if post.benchpath %}
-        <a href="{{ site.baseurl }}resnet/skylake2x/{{ post.revision }}/{{ post.benchpath }}">ResNet50</a>
+        {% if post.resnetbench %}
+        <a href="{{ site.baseurl }}resnet/skylake2x/{{ post.revision }}/{{ post.resnetbench }}">ResNet50</a>
+        {% endif %}
+        {% if post.inceptionbench %}
+        <a href="{{ site.baseurl }}inception/skylake2x/{{ post.revision }}/{{ post.inceptionbench }}">Inception</a>
+        {% endif %}
+        {% if post.vggbench %}
+        <a href="{{ site.baseurl }}gpt2/skylake2x/{{ post.revision }}/{{ post.gptbench }}">GPT2</a>
         {% endif %}
       </h2>
     </li>
