@@ -8,6 +8,7 @@ import pandas as pd
 from plotnine.themes import theme_gray, theme
 from plotnine.themes.elements import (element_line, element_rect,
                                       element_text, element_blank)
+from plotnine.stats import stat_function
 from plotnine import ggplot
 from plotnine.labels import ggtitle
 from plotnine.mapping import aes
@@ -47,6 +48,7 @@ def plot_benchmark_latency_per_batch(benchmarks):
         data_set = []
         for name in benchmarks.benchmark.unique():
             opt = name.split('_')[2].upper()
+            bench = name.split('_')[0]
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "opt={}".format(opt))
@@ -67,7 +69,7 @@ def plot_benchmark_latency_per_batch(benchmarks):
             geom_text(aes(label='change'), size=13, ha="left", va="bottom") + \
             geom_line()
 
-        plot.save("resnet-latency-{}.png".format(batch_size), dpi=300,
+        plot.save("{}-latency-{}.png".format(bench, batch_size), dpi=300,
                   width=12, height=5, verbose=False)
 
 
@@ -78,6 +80,7 @@ def plot_benchmark_latency_per_opt(benchmarks):
         data_set = []
         for batch_size in benchmarks['batch_size'].unique():
             opt = name.split('_')[2]
+            bench = name.split('_')[0]
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
@@ -97,7 +100,7 @@ def plot_benchmark_latency_per_opt(benchmarks):
             geom_point() + \
             geom_line()
 
-        plot.save("resnet-latency-{}.png".format(opt), dpi=300,
+        plot.save("{}-latency-{}.png".format(bench, opt), dpi=300,
                   width=12, height=5, verbose=False)
 
 
@@ -108,6 +111,7 @@ def plot_benchmark_throughputs_per_batch(benchmarks):
         data_set = []
         for name in benchmarks.benchmark.unique():
             opt = name.split('_')[2].upper()
+            bench = name.split('_')[0]
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "opt={}".format(opt))
@@ -129,7 +133,7 @@ def plot_benchmark_throughputs_per_batch(benchmarks):
             geom_text(aes(label='change'), size=13, ha="left", va="bottom") + \
             geom_line()
 
-        plot.save("resnet-throughput-{}.png".format(batch_size), dpi=300,
+        plot.save("{}-throughput-{}.png".format(bench, batch_size), dpi=300,
                   width=12, height=5, verbose=False)
 
 
@@ -140,6 +144,7 @@ def plot_benchmark_throughputs_per_opt(benchmarks):
         data_set = []
         for batch_size in benchmarks['batch_size'].unique():
             opt = name.split('_')[2]
+            bench = name.split('_')[0]
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
@@ -160,7 +165,7 @@ def plot_benchmark_throughputs_per_opt(benchmarks):
             geom_point() + \
             geom_line()
 
-        plot.save("resnet-throughput-{}.png".format(opt), dpi=300,
+        plot.save("{}-throughput-{}.png".format(bench, opt), dpi=300,
                   width=12, height=5, verbose=False)
 
 
@@ -216,6 +221,40 @@ def plot_throughput_heatmap(benchmarks):
         p.save('throughput_heatmap_{}.png'.format(batch_size), dpi=300)
 
 
+def plot_throughput_scaleup(benchmarks):
+    "plots a throughput graph for every data-structure in the results file"
+
+    for name in benchmarks.benchmark.unique():
+        data_set = []
+        for batch_size in benchmarks['batch_size'].unique():
+            opt = name.split('_')[2]
+            bench = name.split('_')[0]
+            benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
+                                       (benchmarks['batch_size'] == batch_size)]
+            benchmark.insert(0, 'config', "Batch={}".format(batch_size))
+            benchmark['speedup'] = (
+                benchmark['throughput'] / benchmark['throughput'].iloc[0]).round(1)
+            data_set.append(benchmark)
+        data = pd.concat(data_set)
+
+        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='speedup', color='config')) + \
+            MyTheme(base_size=10) + \
+            labs(y="Speedup") + \
+            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
+            ggtitle("Throughput Speedup (Opt={})".format(opt.upper())) + \
+            scale_x_continuous(
+                breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
+            scale_y_continuous(labels=lambda lst: ["{:,}".format(x) for x in lst]) + \
+            scale_color_discrete(breaks=data['config'].unique()) + \
+            geom_point() + \
+            geom_line() + \
+            stat_function(geom="line", color='black',
+                          size=1, fun=lambda x: x.mean())
+
+        plot.save("{}-throughput-speedup-{}.png".format(bench, opt), dpi=300,
+                  width=12, height=5, verbose=False)
+
+
 def plot_latency(df):
     plot_latency_heatmap(df)
     plot_benchmark_latency_per_batch(df)
@@ -224,6 +263,8 @@ def plot_latency(df):
 
 def plot_throughput(df):
     plot_throughput_heatmap(df)
+
+    plot_throughput_scaleup(df)
     plot_benchmark_throughputs_per_batch(df)
     plot_benchmark_throughputs_per_opt(df)
 
