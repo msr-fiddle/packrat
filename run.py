@@ -88,9 +88,10 @@ def run(args: Namespace):
     for batch_size in [1, 8, 16, 32]:
         for interop in [1]:
             for intraop in range(1, core_count + 1):
-                proclist = topology.allocate_cores("socket", intraop, config.mapping)
+                proclist = topology.allocate_cores("socket", intraop, config.mapping.name)
 
                 # Set the configuration
+                config.set_mapping(config.mapping)
                 config.set_core_list(proclist)
                 config.set_interop_threads(interop)
                 config.set_intraop_threads(intraop)

@@ -48,7 +48,7 @@ class Config:
             self.benchmark = Benchmark[args.benchmark]
             self.run_type = RunType[args.run_type]
             self.optimization = Optimizations[args.optimization]
-            self.maping = ThreadMapping[args.mapping]
+            self.mapping = ThreadMapping[args.mapping]
             self.batch_size = int(args.batch_size)
             self.iterations = int(args.iterations)
             self.interop_threads = int(args.interop_threads)
@@ -58,6 +58,7 @@ class Config:
             self.benchmark = Benchmark.resnet
             self.run_type = RunType.manual
             self.optimization = Optimizations.none
+            self.mapping = ThreadMapping.sequential
             self.batch_size = 1
             self.iterations = 100
             self.interop_threads = 1
@@ -65,7 +66,7 @@ class Config:
             self.core_list = [0]
 
     def __repr__(self):
-        return 'benchmark={}, run_type={}, optimization={}, batch_size={}, iterations={}, interop_threads={}, intraop_threads={}, core_list={}'.format(self.benchmark.name, self.run_type.name, self.optimization.name, self.batch_size, self.iterations, self.interop_threads, self.intraop_threads, self.core_list)
+        return 'benchmark={}, run_type={}, optimization={}, mapping={}, batch_size={}, iterations={}, interop_threads={}, intraop_threads={}, core_list={}'.format(self.benchmark.name, self.run_type.name, self.optimization.name, self.mapping.name, self.batch_size, self.iterations, self.interop_threads, self.intraop_threads, self.core_list)
 
     @classmethod
     def from_string(self, string: str):
@@ -74,10 +75,13 @@ class Config:
         """
         import re
         args = re.split(', |=', string)
-        return self(Namespace(benchmark=args[1], run_type=args[3], optimization=args[5], batch_size=args[7], iterations=args[9], interop_threads=args[11], intraop_threads=args[13], core_list=args[15]))
+        return self(Namespace(benchmark=args[1], run_type=args[3], optimization=args[5], mapping=args[7], batch_size=args[9], iterations=args[11], interop_threads=args[13], intraop_threads=args[15], core_list=args[17]))
 
     def set_optimization(self, value: Optimizations) -> None:
         self.optimization = value
+
+    def set_mapping(self, value: ThreadMapping) -> None:
+        self.mapping = value
 
     def set_core_list(self, value: list) -> None:
         self.core_list = value
