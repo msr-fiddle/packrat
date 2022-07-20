@@ -13,7 +13,7 @@ from argparse import ArgumentParser, Namespace
 import psutil
 from utils.topology import CPUInfo
 
-from benchmarks.config import Benchmark, Optimizations, RunType, Config
+from benchmarks.config import Benchmark, Optimizations, RunType, Config, ThreadMapping
 
 
 def parse_args():
@@ -24,6 +24,8 @@ def parse_args():
                       help="The run type")
     args.add_argument("--optimization", type=str, default=Optimizations.none.name,
                       help="The optimization to use")
+    args.add_argument("--mapping", type=str, default=ThreadMapping.sequential.name,
+                      help="The thread mapping")
     args.add_argument("--batch-size", type=int, default=1,
                       help="The batch size")
     args.add_argument("--iterations", type=int, default=100,
@@ -86,7 +88,7 @@ def run(args: Namespace):
     for batch_size in [1, 8, 16, 32]:
         for interop in [1]:
             for intraop in range(1, core_count + 1):
-                proclist = topology.allocate_cores("socket", intraop)
+                proclist = topology.allocate_cores("socket", intraop, config.mapping)
 
                 # Set the configuration
                 config.set_core_list(proclist)

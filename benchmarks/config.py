@@ -19,6 +19,14 @@ class RunType(Enum):
     manual = 2
 
 
+class ThreadMapping(Enum):
+    """
+    Enum for the thread mapping
+    """
+    sequential = 1
+    interleave = 2
+
+
 class Optimizations(Enum):
     """
     Enum for the optimizations
@@ -40,6 +48,7 @@ class Config:
             self.benchmark = Benchmark[args.benchmark]
             self.run_type = RunType[args.run_type]
             self.optimization = Optimizations[args.optimization]
+            self.maping = ThreadMapping[args.mapping]
             self.batch_size = int(args.batch_size)
             self.iterations = int(args.iterations)
             self.interop_threads = int(args.interop_threads)

@@ -2,6 +2,7 @@
 This utility is used to allocate the number of cores on the node.
 """
 
+from math import ceil
 import platform
 import re
 import subprocess
@@ -64,9 +65,8 @@ class CPUInfo():
         """
         return {int(node) for cpu, core, node in self.cpuinfo}
 
-
-    def allocate_cores(self, mapping: str, threads: int, hyper_threading: bool = False):
-        """
+    def allocate_cores(self, mapping: str, threads: int, threadMapping: str, hyper_threading: bool = False):
+        """`
         Allocate the number of cores on the node
         """
 
@@ -86,22 +86,29 @@ class CPUInfo():
         if mapping == "machine":
             cores.sort()
 
-        return cores[0:threads]
+        if threadMapping == "sequential" or threads == 1:
+            return cores[:threads]
+        elif threadMapping == "interleave":
+            firstsocket = ceil(threads / len(sockets))
+            secondsocket = threads - firstsocket
+            cores = cores[:firstsocket] + cores[-secondsocket:]
+            return cores
 
 
 def main():
     """
     Main function
     """
-    if len(sys.argv) > 3:
+    if len(sys.argv) > 4:
         print("Error: Too many arguments")
-        print("Usage: {0} [mapping #cores]".format(sys.argv[0]))
+        print("Usage: {0} [mapping #cores threadmapping]".format(sys.argv[0]))
         sys.exit(1)
 
-    if len(sys.argv) == 3:
+    if len(sys.argv) == 4:
         mapping = sys.argv[1]
         cores = int(sys.argv[2])
-        return allocate_cores(mapping, cores)
+        threadMapping = str(sys.argv[3])
+        return CPUInfo().allocate_cores(mapping, cores, threadMapping, False)
 
     print("Error: Unrecognized affinity mapping '{0}'".format(mapping))
     return []
