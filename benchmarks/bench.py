@@ -56,11 +56,11 @@ class Bench(Interface):
                 writer = csv.writer(open(filename, "a+"), delimiter=",")
                 if not exists:
                     writer.writerow(
-                        ["benchmark", "interop_threads", "intraop_threads", "batch_size", "latency(min)", "latency(avg)", "latency(max)"])
+                        ["benchmark", "topology", "interop_threads", "intraop_threads", "batch_size", "latency(min)", "latency(avg)", "latency(max)"])
                 min, max, avg = self.latencies[0] * 1000,  (sum(self.latencies) / len(
                     self.latencies)) * 1000, self.latencies[-1] * 1000
                 writer.writerow(
-                    [benchmark, config.interop_threads, config.intraop_threads, config.batch_size, min, max, avg])
+                    [benchmark, config.mapping.name, config.interop_threads, config.intraop_threads, config.batch_size, min, max, avg])
 
                 logging.debug("Benchmark: {}, Threads: {}, BatchSize: {}, Latencyies: Min {: .2f}, Average  {: .2f}, Max {: .2f} ".format(
                     benchmark, config.interop_threads, config.intraop_threads, config.batch_size, min, max, avg))
@@ -72,11 +72,11 @@ class Bench(Interface):
                 writer = csv.writer(open(filename, "a+"), delimiter=",")
                 if not exists:
                     writer.writerow(
-                        ["benchmark", "interop_threads", "intraop_threads", "batch_size", "throughput"])
+                        ["benchmark", "topology", "interop_threads", "intraop_threads", "batch_size", "throughput"])
                 throughput = (config.batch_size *
                               config.iterations) / sum(self.latencies)
                 writer.writerow(
-                    [benchmark, config.interop_threads, config.intraop_threads, config.batch_size, throughput])
+                    [benchmark, config.mapping.name, config.interop_threads, config.intraop_threads, config.batch_size, throughput])
                 logging.debug("Benchmark: {}, Threads: {}, BatchSize: {}, Throughput: {} ".format(
                               benchmark, config.interop_threads, config.intraop_threads, config.batch_size, throughput))
 
