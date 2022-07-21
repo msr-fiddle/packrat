@@ -83,8 +83,7 @@ def plot_benchmark_latency_per_opt(benchmarks):
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
-            benchmark['change'] = (
-                benchmark['latency(avg)'].pct_change() * 100).round(1)
+            benchmark['change'] = benchmark['latency(avg)'].astype(int)
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
@@ -146,8 +145,7 @@ def plot_benchmark_throughputs_per_opt(benchmarks):
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                        (benchmarks['batch_size'] == batch_size)]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
-            benchmark['change'] = (
-                benchmark['throughput'].pct_change() * 100).round(1)
+            benchmark['change'] = benchmark['throughput'].astype(int)
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
