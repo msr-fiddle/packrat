@@ -1,7 +1,7 @@
 date,revision,path,resnetbench,inceptionbench,gptbench,bertbench
 2022-06-24,efb6225,,index.html
 2022-06-29,6eb235b,,index.html
-2022-07-08,cdf1d77,,index.html,index.html,index,html,index.html
+2022-07-08,cdf1d77,,index.html,index.html,index.html,index.html
 2022-07-18,numa,,index.html
 2022-07-20,numa-interleave,,index.html
 2022-07-20,numa-interleave-no-omp,,index.html
