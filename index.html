@@ -20,6 +20,9 @@ layout: default
         {% if post.gptbench %}
         <a href="{{ site.baseurl }}gpt2/skylake2x/{{ post.revision }}/{{ post.gptbench }}">GPT2</a>
         {% endif %}
+	{% if post.bertbench %}
+	<a href="{{ site.baseurl }}bert/skylake2x/{{ post.revision }}/{{ post.bertbench }}">Bert</a>
+	{% endif %}
       </h2>
     </li>
     {% endfor %}
