@@ -9,6 +9,7 @@ class Benchmark(Enum):
     resnet = 1
     inception = 2
     gpt2 = 3
+    bert = 4
 
 
 class RunType(Enum):

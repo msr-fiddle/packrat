@@ -4,7 +4,7 @@ import os
 from sys import argv
 import timeit
 import torch
-from transformers import BertTokenizer, BertModel 
+from transformers import BertTokenizer, BertModel
 from interface import implements
 
 from bench import Bench
@@ -14,7 +14,7 @@ from config import Benchmark, Config, RunType
 class BertBench(implements(Bench)):
     def run(self, config: Config) -> None:
         model = self.get_model()
-        data = self.get_test_data(config.batch_size)
+        data, segments = self.get_test_data(config.batch_size)
 
         model, data = self.optimize_memory_layout(
             config.optimization, model, data)
@@ -22,57 +22,51 @@ class BertBench(implements(Bench)):
         if config.run_type == RunType.default:
             self.inference_benchmark(config, model, data)
         elif config.run_type == RunType.manual:
-            self.inference_manual(config, model, data)
+            self.inference_manual(config, model, data, segments)
 
     def get_model(self) -> torch.nn.Module:
         model = BertModel.from_pretrained('bert-base-uncased')
         model.eval()
         return model
 
-    def warmup(self, model, data):
+    def warmup(self, model, data, segments):
         with torch.no_grad():
-            timeit.Timer(lambda: self.run_inference(
-                model, data)).timeit(number=10)
+            timeit.Timer(lambda: self.run_inference_custom(
+                model, data, segments)).timeit(number=10)
 
     def get_test_data(self, batch_size: int) -> torch.Tensor:
         text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        tokenized_text = tokenizer.tokenize(text)
 
-        masked_index = 8
-        tokenized_text[masked_index] = '[MASK]'
+        input = []
+        for _ in range(batch_size):
+            input.append(text)
+        encoded = tokenizer.batch_encode_plus(
+            input, add_special_tokens=True, padding=True, return_tensors='pt', return_token_type_ids=True)
 
-        indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
-        segments_ids = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1]
-
-        input_tensor = torch.tensor([indexed_tokens])
-        segments_tensors = torch.tensor([segments_ids])
-
-        input_batch = []
-        for i in range(0, batch_size, 1):
-            input_batch.append(input_tensor)
-
-        data = torch.stack(input_batch)
-        return data
+        return encoded['input_ids'], encoded['token_type_ids']
 
     def run_inference(self, model: torch.nn.Module, data: torch.Tensor):
-        return model(data)
+        pass
 
-    def inference_manual(self, config: Config, model: torch.nn.Module, data: torch.Tensor):
+    def run_inference_custom(self, model: torch.nn.Module, data: torch.Tensor, segments: torch.Tensor):
+        return model(data, token_type_ids=segments)
+
+    def inference_manual(self, config: Config, model: torch.nn.Module, data: torch.Tensor, segments):
         torch.set_num_threads(config.intraop_threads)
         torch.set_num_interop_threads(config.interop_threads)
 
         assert torch.get_num_threads, config.intraop_threads
         assert torch.get_num_interop_threads, config.interop_threads
 
-        self.warmup(model, data)
+        self.warmup(model, data, segments)
 
         for index in range(config.iterations):
             self.latencies[index] = timeit.Timer(
-                lambda: self.run_inference(model, data)).timeit(number=1)
+                lambda: self.run_inference_custom(model, data, segments)).timeit(number=1)
 
     def inference_benchmark(self, model, data):
-        pass 
+        pass
 
 
 if __name__ == "__main__":
