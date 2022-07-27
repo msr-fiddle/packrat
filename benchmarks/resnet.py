@@ -30,6 +30,10 @@ class ResnetBench(implements(Bench)):
         elif config.run_type == RunType.manual:
             self.inference_manual(config, model, data)
 
+        # Measure FLOPS
+        if config.intraop_threads == 1 and config.interop_threads == 1:
+            self.measure_flops(config, model, data)
+
     def get_model(self) -> torch.nn.Module:
         model = models.resnet50(pretrained=True)
         model.eval()
@@ -66,6 +70,16 @@ class ResnetBench(implements(Bench)):
 
     def run_inference(self, model: torch.nn.Module, data: torch.Tensor):
         return model(data)
+
+    def measure_flops(self, config, model, data):
+        from pypapi import events, papi_high as high
+
+        high.start_counters([events.PAPI_DP_OPS, events.PAPI_SP_OPS])
+
+        for _ in range(config.iterations):
+            self.run_inference(model, data)
+
+        config.set_flops(sum(high.stop_counters()))
 
     def inference_manual(self, config: Config, model: torch.nn.Module, data: torch.Tensor):
         torch.set_num_threads(config.intraop_threads)

@@ -1,3 +1,4 @@
+import sys
 from interface import Interface
 import interface
 import torch
@@ -56,11 +57,13 @@ class Bench(Interface):
                 writer = csv.writer(open(filename, "a+"), delimiter=",")
                 if not exists:
                     writer.writerow(
-                        ["benchmark", "topology", "interop_threads", "intraop_threads", "batch_size", "latency(min)", "latency(avg)", "latency(max)"])
+                        ["benchmark", "topology", "interop_threads", "intraop_threads", "batch_size", "latency(min)", "latency(avg)", "latency(max)", "flops"])
                 min, max, avg = self.latencies[0] * 1000,  (sum(self.latencies) / len(
                     self.latencies)) * 1000, self.latencies[-1] * 1000
+                lat = sum(self.latencies)
+                flops = (config.flops / lat)/1e9
                 writer.writerow(
-                    [benchmark, config.mapping.name, config.interop_threads, config.intraop_threads, config.batch_size, min, max, avg])
+                    [benchmark, config.mapping.name, config.interop_threads, config.intraop_threads, config.batch_size, min, max, avg, flops])
 
                 logging.debug("Benchmark: {}, Threads: {}, BatchSize: {}, Latencyies: Min {: .2f}, Average  {: .2f}, Max {: .2f} ".format(
                     benchmark, config.interop_threads, config.intraop_threads, config.batch_size, min, max, avg))
@@ -82,4 +85,4 @@ class Bench(Interface):
 
         report_latency()
         report_throughput()
-        return
+        sys.stdout.write(str(config.flops) + '\n')

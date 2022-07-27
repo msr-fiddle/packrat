@@ -36,6 +36,8 @@ def parse_args():
                       help="The number of intraop threads")
     args.add_argument("--core-list", type=int, nargs='+', default=[],
                       help="The list of cores to pin to")
+    args.add_argument("--flops", type=int, default=0,
+                      help="The number of flops")
     return args.parse_args()
 
 
@@ -72,8 +74,10 @@ def run_with_parameters(config: Config):
     cmd.append(f"./benchmarks/{config.benchmark.name}.py")
     cmd.append(repr(config))
     logging.info("Running: %s", " ".join(cmd))
-    ret = subprocess.check_call(cmd, env=myenv)
-    assert ret == 0
+    ret = subprocess.check_output(cmd, env=myenv)
+    if config.intraop_threads == 1:
+        flops = int(ret.decode("utf-8").split("\n")[-2])
+        config.set_flops(flops)
 
 
 def run(args: Namespace):
@@ -88,7 +92,8 @@ def run(args: Namespace):
     for batch_size in [1, 8, 16, 32]:
         for interop in [1]:
             for intraop in range(1, core_count + 1):
-                proclist = topology.allocate_cores("socket", intraop, config.mapping.name)
+                proclist = topology.allocate_cores(
+                    "socket", intraop, config.mapping.name)
 
                 # Set the configuration
                 config.set_mapping(config.mapping)
