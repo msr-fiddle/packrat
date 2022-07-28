@@ -13,36 +13,45 @@ latency[t',b'] = latency of processing a batch with b' inputs with t' threads (f
 
 import numpy as np
 
+
 class Optimizer:
+    """
+    Configuration optimizer for the benchmark.
+    """
+
     def __init__(self):
         pass
 
-    def minLatency(self, maxThreads, maxBatch, latency):
+    def min_latency(self, max_threads, max_batch, latency):
         """
-        Given a set of threads and batches, find the minimum latency of processing a batch with n inputs.
-        :param maxThreads: maximum number of threads
-        :param maxBatch: maximum number of batches
+        Given a set of threads and batches, find the minimum latency.
+        :param max_threads: maximum number of threads
+        :param max_batch: maximum number of batches
         :param latency: matrix of latencies
         :return: optimial latency matrix
         """
 
-        opt = [[0 for _ in range(maxBatch + 1)] for _ in range(maxThreads + 1)]
-        assert latency.shape == (maxThreads + 1, maxBatch + 1)
+        opt = [[0 for _ in range(max_batch + 1)]
+               for _ in range(max_threads + 1)]
+        assert latency.shape == (max_threads + 1, max_batch + 1)
 
-        for t in range(1, maxThreads + 1):
-            for b in range(1, maxBatch + 1):
-                opt[t][b] = float('inf')
-                for t_i in range(1, t + 1):
-                    for b_i in range(1, b + 1):
-                        opt[t][b] = min(opt[t][b], opt[t - t_i]
-                                        [b - b_i] + latency[t_i][b_i])
+        for batch in range(1, max_batch + 1):
+            opt[0][batch] = float('inf')
 
-        print(f"latency { latency}")
-        print(f"opt { np.array(opt)}")
-        return opt[maxThreads][maxBatch]
+        for thread in range(1, max_threads + 1):
+            for batch in range(1, max_batch + 1):
+                opt[thread][batch] = float('inf')
+                for t_i in range(1, thread + 1):
+                    for b_i in range(1, batch + 1):
+                        opt[thread][batch] = min(opt[thread][batch], opt[thread - t_i]
+                                                 [batch - b_i] + latency[t_i][b_i])
+
+        # print(f"latency { latency}")
+        # print(f"opt { np.array(opt)}")
+        return opt[max_threads][max_batch]
 
 
 if __name__ == "__main__":
     optimizer = Optimizer()
-    assert optimizer.minLatency(
+    assert optimizer.min_latency(
         3, 3, np.array([[0, 0, 0, 0], [0, 7, 8, 9], [0, 4, 5, 6], [0, 1, 2, 3]])) == 3
