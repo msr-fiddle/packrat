@@ -38,6 +38,8 @@ def parse_args():
                       help="The list of cores to pin to")
     args.add_argument("--flops", type=int, default=0,
                       help="The number of flops")
+    args.add_argument("--instances", type=int, default=1,
+                      help="The number of instances")
     return args.parse_args()
 
 
@@ -106,6 +108,49 @@ def run(args: Namespace):
                 run_with_parameters(config)
 
 
+def run_multi_instances(args: Namespace):
+    assert args.instances == 2
+    config1 = Config(args)
+    config2 = Config(args)
+    config1.set_instance_id(1)
+    config2.set_instance_id(2)
+
+    for batch_size in [1, 8, 16, 32]:
+        config1.set_batch_size(batch_size)
+        config2.set_batch_size(batch_size)
+
+        config1.set_intraop_threads(8)
+        config2.set_intraop_threads(8)
+
+        config1.set_core_list([0, 1, 2, 3, 4, 5, 6, 7])
+        config2.set_core_list([8, 9, 10, 11, 12, 13, 14, 15])
+
+        instances = []
+        cmd1 = [
+            "numactl", "-C {}".format(",".join(str(x)
+                                               for x in config1.core_list)),
+            "python3"
+        ]
+        cmd2 = [
+            "numactl", "-C {}".format(",".join(str(x)
+                                               for x in config2.core_list)),
+            "python3"
+        ]
+        cmd1.append(f"./benchmarks/{config1.benchmark.name}.py")
+        cmd1.append(repr(config1))
+
+        cmd2.append(f"./benchmarks/{config2.benchmark.name}.py")
+        cmd2.append(repr(config2))
+        instances.append(subprocess.Popen(cmd1, env=os.environ.copy()))
+        instances.append(subprocess.Popen(cmd2, env=os.environ.copy()))
+
+        for instance in instances:
+            instance.wait()
+
+
 if __name__ == '__main__':
     arguments = parse_args()
-    run(arguments)
+    if arguments.instances == 1:
+        run(arguments)
+    else:
+        run_multi_instances(arguments)

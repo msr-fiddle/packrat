@@ -54,8 +54,9 @@ class Config:
             self.iterations = int(args.iterations)
             self.interop_threads = int(args.interop_threads)
             self.intraop_threads = int(args.intraop_threads)
+            self.flops = int(args.flops)
+            self.instance_id = 1
             self.core_list = args.core_list
-            self.flops = args.flops
         else:
             self.benchmark = Benchmark.resnet
             self.run_type = RunType.manual
@@ -65,11 +66,12 @@ class Config:
             self.iterations = 100
             self.interop_threads = 1
             self.intraop_threads = 1
-            self.core_list = [0]
             self.flops = 0
+            self.instance_id = 1
+            self.core_list = [0]
 
     def __repr__(self):
-        return 'benchmark={}, run_type={}, optimization={}, mapping={}, batch_size={}, iterations={}, interop_threads={}, intraop_threads={}, flops={}, core_list={}'.format(self.benchmark.name, self.run_type.name, self.optimization.name, self.mapping.name, self.batch_size, self.iterations, self.interop_threads, self.intraop_threads, self.flops, self.core_list)
+        return 'benchmark={}, run_type={}, optimization={}, mapping={}, batch_size={}, iterations={}, interop_threads={}, intraop_threads={}, instance_id={}, flops={}, core_list={}'.format(self.benchmark.name, self.run_type.name, self.optimization.name, self.mapping.name, self.batch_size, self.iterations, self.interop_threads, self.intraop_threads, self.flops, self.instance_id, self.core_list)
 
     @classmethod
     def from_string(self, string: str):
@@ -78,7 +80,7 @@ class Config:
         """
         import re
         args = re.split(', |=', string)
-        return self(Namespace(benchmark=args[1], run_type=args[3], optimization=args[5], mapping=args[7], batch_size=args[9], iterations=args[11], interop_threads=args[13], intraop_threads=args[15], flops=int(args[17]), core_list=args[19]))
+        return self(Namespace(benchmark=args[1], run_type=args[3], optimization=args[5], mapping=args[7], batch_size=args[9], iterations=args[11], interop_threads=args[13], intraop_threads=args[15], flops=int(args[17]), instance_id=int(args[19]), core_list=args[21]))
 
     def set_optimization(self, value: Optimizations) -> None:
         self.optimization = value
@@ -100,3 +102,6 @@ class Config:
 
     def set_flops(self, value: int) -> None:
         self.flops = value
+
+    def set_instance_id(self, value: int) -> None:
+        self.instance_id = value

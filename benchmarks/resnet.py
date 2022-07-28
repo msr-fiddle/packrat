@@ -19,6 +19,7 @@ from config import Benchmark, Config, RunType
 
 class ResnetBench(implements(Bench)):
     def run(self, config: Config) -> None:
+        print(config)
         model = self.get_model()
         data = self.get_test_data(config.batch_size)
 
