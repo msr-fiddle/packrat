@@ -2,8 +2,9 @@
 Script that plots benchmark data-visualizations.
 """
 
+from argparse import ArgumentParser
+from enum import Enum
 import sys
-from turtle import color
 import pandas as pd
 from plotnine.themes import theme_gray, theme
 from plotnine.themes.elements import (element_line, element_rect,
@@ -13,7 +14,7 @@ from plotnine import ggplot
 from plotnine.labels import ggtitle
 from plotnine.mapping import aes
 from plotnine.labels import labs
-from plotnine.scales import scale_x_continuous, scale_y_continuous, scale_color_discrete, scale_fill_gradientn
+from plotnine.scales import scale_x_continuous, scale_y_continuous, scale_color_discrete, scale_fill_gradientn, scale_x_log10
 from plotnine.geoms import geom_point, geom_line, geom_tile, geom_text
 
 
@@ -41,8 +42,20 @@ class MyTheme(theme_gray):
             inplace=True)
 
 
-def plot_benchmark_latency_per_batch(benchmarks):
+def scaling_plot_per_batch(benchmarks, yaxis: str, label: str):
     "Plots a latency graph for every data-structure in the results file"
+
+    if yaxis not in ['latency(avg)', 'throughput', 'flops']:
+        print("Invalid y-axis: {}".format(yaxis))
+        sys.exit(1)
+
+    ylabel = ""
+    if yaxis == 'latency(avg)':
+        ylabel = "Latency per batch (ms)"
+    elif yaxis == 'throughput':
+        ylabel = "Throughput (Inferences/sec)"
+    elif yaxis == 'flops':
+        ylabel = "GFLOPs/sec"
 
     for batch_size in benchmarks['batch_size'].unique():
         data_set = []
@@ -50,16 +63,17 @@ def plot_benchmark_latency_per_batch(benchmarks):
             opt = name.split('_')[2].upper()
             bench = name.split('_')[0]
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
-                                       (benchmarks['batch_size'] == batch_size)]
+                                       (benchmarks['batch_size'] == batch_size) &
+                                       (benchmarks['topology'] == "sequential")]
             benchmark.insert(0, 'config', "opt={}".format(opt))
-            benchmark['change'] = benchmark['latency(avg)'].astype(int)
+            benchmark['change'] = benchmark[yaxis].astype(int)
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
-        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='latency(avg)', color='config')) + \
-            MyTheme(base_size=10) + labs(y="Latency per batch [ms]") + \
+        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y=yaxis, color='config')) + \
+            MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
             theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
-            ggtitle("Threads vs Latency (BS={})".format(batch_size)) + \
+            ggtitle("Threads vs {} (BS={})".format(label, batch_size)) + \
             scale_x_continuous(
                 breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
             scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
@@ -68,12 +82,24 @@ def plot_benchmark_latency_per_batch(benchmarks):
             geom_text(aes(label='change'), size=13, ha="left", va="bottom") + \
             geom_line()
 
-        plot.save("{}-latency-{}.png".format(bench, batch_size), dpi=300,
+        plot.save("{}-{}-{}.png".format(bench, label.lower(), batch_size), dpi=300,
                   width=12, height=5, verbose=False)
 
 
-def plot_benchmark_latency_per_opt(benchmarks):
+def scaling_plot_per_opt(benchmarks, yaxis: str, label: str):
     "Plots a latency graph for every data-structure in the results file"
+
+    if yaxis not in ['latency(avg)', 'throughput', 'flops']:
+        print("Invalid y-axis: {}".format(yaxis))
+        sys.exit(1)
+
+    ylabel = ""
+    if yaxis == 'latency(avg)':
+        ylabel = "Latency per batch (ms)"
+    elif yaxis == 'throughput':
+        ylabel = "Throughput (Inferences/sec)"
+    elif yaxis == 'flops':
+        ylabel = "GFLOPs/sec"
 
     for name in benchmarks.benchmark.unique():
         data_set = []
@@ -81,16 +107,17 @@ def plot_benchmark_latency_per_opt(benchmarks):
             opt = name.split('_')[2]
             bench = name.split('_')[0]
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
-                                       (benchmarks['batch_size'] == batch_size)]
+                                       (benchmarks['batch_size'] == batch_size) &
+                                       (benchmarks['topology'] == "sequential")]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
-            benchmark['change'] = benchmark['latency(avg)'].astype(int)
+            benchmark['change'] = benchmark[yaxis].astype(int)
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
-        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='latency(avg)', color='config')) + \
-            MyTheme(base_size=10) + labs(y="Latency per batch [ms]") + \
+        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y=yaxis, color='config')) + \
+            MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
             theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
-            ggtitle("Threads vs Latency (Opt={})".format(opt.upper())) + \
+            ggtitle("Threads vs {} (Opt={})".format(label, opt.upper())) + \
             scale_x_continuous(
                 breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
             scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
@@ -98,123 +125,83 @@ def plot_benchmark_latency_per_opt(benchmarks):
             geom_point() + \
             geom_line()
 
-        plot.save("{}-latency-{}.png".format(bench, opt), dpi=300,
+        plot.save("{}-{}-{}.png".format(bench, label.lower(), opt), dpi=300,
                   width=12, height=5, verbose=False)
 
 
-def plot_benchmark_throughputs_per_batch(benchmarks):
-    "plots a throughput graph for every data-structure in the results file"
+def scaling_plot_per_thread(benchmarks, yaxis: str, label: str):
+    "Plots a latency or throughput graph for every data-structure in the results file"
 
-    for batch_size in benchmarks['batch_size'].unique():
-        data_set = []
-        for name in benchmarks.benchmark.unique():
-            opt = name.split('_')[2].upper()
-            bench = name.split('_')[0]
-            benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
-                                       (benchmarks['batch_size'] == batch_size)]
-            benchmark.insert(0, 'config', "opt={}".format(opt))
-            benchmark['change'] = benchmark['throughput'].astype(int)
-            data_set.append(benchmark)
-        data = pd.concat(data_set)
+    if yaxis not in ['latency(avg)', 'throughput']:
+        print("Invalid y-axis: {}".format(yaxis))
+        sys.exit(1)
 
-        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='throughput', color='config')) + \
-            MyTheme(base_size=10) + \
-            labs(y="throughput [inferences/sec]") + \
-            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
-            ggtitle("Threads vs Throughput (BS={})".format(batch_size)) + \
-            scale_x_continuous(
-                breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
-            scale_y_continuous(labels=lambda lst: ["{:,}".format(x) for x in lst]) + \
-            scale_color_discrete(breaks=data['config'].unique()) + \
-            geom_point() + \
-            geom_text(aes(label='change'), size=13, ha="left", va="bottom") + \
-            geom_line()
-
-        plot.save("{}-throughput-{}.png".format(bench, batch_size), dpi=300,
-                  width=12, height=5, verbose=False)
-
-
-def plot_benchmark_throughputs_per_opt(benchmarks):
-    "plots a throughput graph for every data-structure in the results file"
+    ylabel = ""
+    if yaxis == 'latency(avg)':
+        ylabel = "Latency per batch (ms)"
+    elif yaxis == 'throughput':
+        ylabel = "Throughput (Inferences/sec)"
 
     for name in benchmarks.benchmark.unique():
         data_set = []
-        for batch_size in benchmarks['batch_size'].unique():
-            opt = name.split('_')[2]
+        for intraop_threads in benchmarks['intraop_threads'].unique():
+            if intraop_threads % 2 != 0 and intraop_threads != 1:
+                continue
+            opt = name.split('_')[2].upper()
             bench = name.split('_')[0]
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
-                                       (benchmarks['batch_size'] == batch_size)]
-            benchmark.insert(0, 'config', "Batch={}".format(batch_size))
-            benchmark['change'] = benchmark['throughput'].astype(int)
+                                       (benchmarks['intraop_threads'] == intraop_threads) &
+                                       (benchmarks['topology'] == "sequential")]
+            benchmark.insert(0, 'config', "Threads={}".format(intraop_threads))
+            benchmark['change'] = benchmark[yaxis].astype(int)
             data_set.append(benchmark)
-        data = pd.concat(data_set)
+    data = pd.concat(data_set)
 
-        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='throughput', color='config')) + \
-            MyTheme(base_size=10) + \
-            labs(y="throughput [inferences/sec]") + \
-            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
-            ggtitle("Threads vs Throughput (Opt={})".format(opt.upper())) + \
-            scale_x_continuous(
-                breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
-            scale_y_continuous(labels=lambda lst: ["{:,}".format(x) for x in lst]) + \
-            scale_color_discrete(breaks=data['config'].unique()) + \
-            geom_point() + \
-            geom_line()
+    plot = ggplot(data=data, mapping=aes(x='batch_size', y=yaxis, color='config')) + \
+        MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
+        theme(legend_position='top', legend_title=element_blank()) + \
+        ggtitle("Batch-Size vs {} (Opt={})".format(label, opt.upper())) + \
+        scale_x_log10(
+        breaks=data['batch_size'].unique(), labels=["{}".format(thr) for thr in data['batch_size'].unique()], name='Batch Size') + \
+        scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
+        scale_color_discrete(breaks=data['config'].unique()) + \
+        geom_point() + \
+        geom_line()
 
-        plot.save("{}-throughput-{}.png".format(bench, opt), dpi=300,
-                  width=12, height=5, verbose=False)
+    plot.save("{}-{}-{}-perBS.png".format(bench, label.lower(), opt.lower()), dpi=300,
+              width=12, height=5, verbose=False)
 
 
-def plot_latency_heatmap(benchmarks):
+def plot_scaling_heatmap(benchmarks, yaxis: str, label: str):
+    "Plots a latency graph for every data-structure in the results file"
+
+    if yaxis not in ['latency(avg)', 'throughput']:
+        print("Invalid y-axis: {}".format(yaxis))
+        sys.exit(1)
+
     for batch_size in benchmarks['batch_size'].unique():
         benchmark = benchmarks.loc[benchmarks['batch_size'] == batch_size]
-        benchmark['latency(avg)'] = benchmark['latency(avg)'].astype(int)
+        benchmark[yaxis] = benchmark[yaxis].astype(int)
 
         p = ggplot(data=benchmark,
-                   mapping=aes(x='intraop_threads', y='interop_threads', fill='latency(avg)')) + \
+                   mapping=aes(x='intraop_threads', y='interop_threads', fill=yaxis)) + \
             labs(x="#Intraop Threads") + \
             labs(y="#Interop Threads") + \
             theme(legend_position="right", legend_title=element_blank()) +\
             scale_x_continuous(breaks=benchmark['intraop_threads'].unique(), labels=["{}".format(thr) for thr in benchmark['intraop_threads'].unique()]) + \
             scale_y_continuous(breaks=benchmark['interop_threads'].unique(), labels=["{}".format(thr) for thr in benchmark['interop_threads'].unique()]) + \
             geom_tile(aes(width=.95, height=.95)) + \
-            ggtitle("Latency for BS = {}".format(batch_size)) + \
-            geom_text(aes(label='latency(avg)'), size=7, color='black') + \
+            ggtitle("{} for BS = {}".format(label, batch_size)) + \
+            geom_text(aes(label=yaxis), size=7, color='black') + \
             theme(axis_text_x=element_text(size=10),
                   axis_text_y=element_text(size=10),
                   panel_background=element_rect(fill="white"),
                   panel_grid_major=element_line(colour="white"),
                   strip_background=element_rect(colour="orange", fill="orange")) + \
             scale_fill_gradientn(colors=[
-                                 "#0080FF", "#00FFFF", "#00FF80", "#FFFF00", "#FF8000", "#FF0000", "#800000"])
+                "#0080FF", "#00FFFF", "#00FF80", "#FFFF00", "#FF8000", "#FF0000", "#800000"])
 
-        p.save('latency_heatmap_{}.png'.format(batch_size), dpi=300)
-
-
-def plot_throughput_heatmap(benchmarks):
-    for batch_size in benchmarks['batch_size'].unique():
-        benchmark = benchmarks.loc[benchmarks['batch_size'] == batch_size]
-        benchmark['throughput'] = benchmark['throughput'].astype(int)
-
-        p = ggplot(data=benchmark,
-                   mapping=aes(x='intraop_threads', y='interop_threads', fill='throughput')) + \
-            labs(x="#Intraop Threads") + \
-            labs(y="#Interop Threads") + \
-            theme(legend_position="right", legend_title=element_blank()) +\
-            scale_x_continuous(breaks=benchmark['intraop_threads'].unique(), labels=["{}".format(thr) for thr in benchmark['intraop_threads'].unique()]) + \
-            scale_y_continuous(breaks=benchmark['interop_threads'].unique(), labels=["{}".format(thr) for thr in benchmark['interop_threads'].unique()]) + \
-            geom_tile(aes(width=.95, height=.95)) + \
-            ggtitle("Throughput for BS = {}".format(batch_size)) + \
-            geom_text(aes(label='throughput'), size=7, color='black') + \
-            theme(axis_text_x=element_text(size=10),
-                  axis_text_y=element_text(size=10),
-                  panel_background=element_rect(fill="white"),
-                  panel_grid_major=element_line(colour="white"),
-                  strip_background=element_rect(colour="orange", fill="orange")) + \
-            scale_fill_gradientn(colors=[
-                                 "#0080FF", "#00FFFF", "#00FF80", "#FFFF00", "#FF8000", "#FF0000", "#800000"])
-
-        p.save('throughput_heatmap_{}.png'.format(batch_size), dpi=300)
+        p.save('{}_heatmap_{}.png'.format(label.lower(), batch_size), dpi=300)
 
 
 def plot_throughput_scaleup(benchmarks):
@@ -226,7 +213,8 @@ def plot_throughput_scaleup(benchmarks):
             opt = name.split('_')[2]
             bench = name.split('_')[0]
             benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
-                                       (benchmarks['batch_size'] == batch_size)]
+                                       (benchmarks['batch_size'] == batch_size) &
+                                       (benchmarks['topology'] == "sequential")]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
             benchmark['speedup'] = (
                 benchmark['throughput'] / benchmark['throughput'].iloc[0]).round(1)
@@ -251,32 +239,124 @@ def plot_throughput_scaleup(benchmarks):
                   width=12, height=5, verbose=False)
 
 
-def plot_latency(df):
-    plot_latency_heatmap(df)
-    plot_benchmark_latency_per_batch(df)
-    plot_benchmark_latency_per_opt(df)
+def plot_sequential_and_interleaved_comparison_per_batch(benchmarks, yaxis: str, label: str):
+    "Plotting sequential and interleaved comparison per batch"
+
+    if yaxis not in ['latency(avg)', 'throughput']:
+        print("Invalid y-axis: {}".format(yaxis))
+        sys.exit(1)
+
+    ylabel = ""
+    if yaxis == 'latency(avg)':
+        ylabel = "Latency per batch (ms)"
+    elif yaxis == 'throughput':
+        ylabel = "Throughput (Inferences/sec)"
+
+    for batch_size in benchmarks['batch_size'].unique():
+        data_set = []
+        for name in benchmarks.benchmark.unique():
+            for topo in benchmarks['topology'].unique():
+                opt = name.split('_')[2].upper()
+                bench = name.split('_')[0]
+                benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
+                                           (benchmarks['batch_size'] == batch_size) &
+                                           (benchmarks['topology'] == topo)]
+                benchmark.insert(
+                    0, 'config', "opt={},topo={}".format(opt, topo))
+                benchmark['change'] = benchmark[yaxis].astype(int)
+                data_set.append(benchmark)
+        data = pd.concat(data_set)
+
+        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y=yaxis, color='config')) + \
+            MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
+            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
+            ggtitle("Threads vs {} (BS={})".format(label, batch_size)) + \
+            scale_x_continuous(
+                breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
+            scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
+            scale_color_discrete(breaks=data['config'].unique()) + \
+            geom_point() + \
+            geom_text(aes(label='change'), size=13, ha="left", va="bottom") + \
+            geom_line()
+
+        plot.save("{}-{}-numa-{}.png".format(bench, label.lower(), batch_size), dpi=300,
+                  width=12, height=5, verbose=False)
 
 
-def plot_throughput(df):
-    plot_throughput_heatmap(df)
+class Plots(Enum):
+    latency = 1
+    throughput = 2
 
-    plot_throughput_scaleup(df)
-    plot_benchmark_throughputs_per_batch(df)
-    plot_benchmark_throughputs_per_opt(df)
+
+class PType(Enum):
+    normal = 1  # Normal scaleup plot #Threads vs Throughput or Latency
+    heatmap = 2  # Heatmap plot for latency and throughput
+    scaleup = 3  # Scaleup plot for throughput
+    flops = 4  # Threads vs GFLOPs/sec
+    numa = 5  # Threads vs latency or throughput comparison between sequential and interleaved case
+    batch = 6  # Threads vs throughput or latency comparison per thread
+    all = 255
+
+
+def args_parser():
+    args = ArgumentParser(description="Run the plot script")
+    args.add_argument("-p", "--plot", type=str, default=Plots.latency.name,
+                      help="Script supports the following plot types {}".format([plot.name for plot in Plots]))
+    args.add_argument("-t", "--type", type=str, default=PType.normal.name,
+                      help="Script supports the following plot types {}".format([t.name for t in PType]))
+    args.add_argument("-f", "--file", type=str, required=True,
+                      help="Path to the date file.")
+
+    if len(sys.argv) < 2:
+        args.print_help()
+        sys.exit(1)
+    return args.parse_args()
+
+
+def plot_latency(df, ptype):
+    if ptype == PType.normal or ptype == PType.all:
+        scaling_plot_per_batch(df, 'latency(avg)', 'Latency')
+        scaling_plot_per_opt(df, 'latency(avg)', 'Latency')
+    elif ptype == PType.heatmap or ptype == PType.all:
+        plot_scaling_heatmap(df, 'latency(avg)', 'Latency')
+    elif ptype == PType.flops or ptype == PType.all:
+        scaling_plot_per_batch(df, 'flops', 'Flops')
+        scaling_plot_per_opt(df, 'flops', 'Flops')
+    elif ptype == PType.numa or ptype == PType.all:
+        plot_sequential_and_interleaved_comparison_per_batch(
+            df, 'latency(avg)', 'Latency')
+    elif ptype == PType.batch or ptype == PType.all:
+        scaling_plot_per_thread(df, 'latency(avg)', 'Latency')
+    else:
+        raise Exception("Unknown plot type")
+
+
+def plot_throughput(df, ptype):
+    if ptype == PType.normal or ptype == PType.all:
+        scaling_plot_per_batch(df, 'throughput', 'Throughput')
+        scaling_plot_per_opt(df, 'throughput', 'Throughput')
+    elif ptype == PType.heatmap or ptype == PType.all:
+        plot_scaling_heatmap(df, 'throughput', 'Throughput')
+    elif ptype == PType.scaleup or ptype == PType.all:
+        plot_throughput_scaleup(df)
+    elif ptype == PType.numa or ptype == PType.all:
+        plot_sequential_and_interleaved_comparison_per_batch(
+            df, 'throughput', 'Throughput')
+    elif ptype == PType.batch or ptype == PType.all:
+        scaling_plot_per_thread(df, 'throughput', 'Throughput')
+    else:
+        raise Exception("Unknown plot type")
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print("Usage: latency.py latency/throughput <results-file>")
-        sys.exit(1)
+    args = args_parser()
 
-    DF = pd.read_csv(sys.argv[2], skip_blank_lines=True)
+    DF = pd.read_csv(args.file, skip_blank_lines=True)
 
-    if sys.argv[1] == "latency":
-        plot_latency(DF)
-    elif sys.argv[1] == "throughput":
-        plot_throughput(DF)
-
+    if args.plot == Plots.latency.name:
+        plot_latency(DF, PType[args.type])
+    elif args.plot == Plots.throughput.name:
+        plot_throughput(DF, PType[args.type])
     else:
-        print("Unknown benchmark type")
+        print("Unknown plot type")
         sys.exit(1)

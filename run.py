@@ -22,7 +22,7 @@ def parse_args():
                       help="The benchmark to run")
     args.add_argument("--run-type", type=str, default=RunType.manual.name,
                       help="The run type")
-    args.add_argument("--optimization", type=str, default=Optimizations.none.name,
+    args.add_argument("--optimization", type=str, default=Optimizations.script.name,
                       help="The optimization to use")
     args.add_argument("--mapping", type=str, default=ThreadMapping.sequential.name,
                       help="The thread mapping")
