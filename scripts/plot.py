@@ -14,7 +14,7 @@ from plotnine import ggplot
 from plotnine.labels import ggtitle
 from plotnine.mapping import aes
 from plotnine.labels import labs
-from plotnine.scales import scale_x_continuous, scale_y_continuous, scale_color_discrete, scale_fill_gradientn, scale_x_log10
+from plotnine.scales import scale_x_continuous, scale_y_continuous, scale_color_discrete, scale_fill_gradientn, scale_x_log10, scale_y_log10
 from plotnine.geoms import geom_point, geom_line, geom_tile, geom_text
 
 
@@ -283,6 +283,58 @@ def plot_sequential_and_interleaved_comparison_per_batch(benchmarks, yaxis: str,
                   width=12, height=5, verbose=False)
 
 
+def plot_multiinstance_comparison_per_batch(benchmarks, yaxis: str, label: str):
+    maxthreads = 16
+    instances = [1, 2, 4, 8]
+    bench = benchmarks['benchmark'].iloc[0].split('_')[0]
+
+    ylabel = ""
+    if yaxis == 'latency(avg)':
+        ylabel = "Latency per batch (ms)"
+    elif yaxis == 'throughput':
+        ylabel = "Throughput (Inferences/sec)"
+
+    data = pd.DataFrame()
+    for batch_size in benchmarks['batch_size'].unique():
+        if batch_size < 8:
+            continue
+
+        for instance in instances:
+            t = maxthreads / instance
+            b = batch_size / instance
+            point = benchmarks.loc[(benchmarks['topology'] == "sequential") &
+                                   (benchmarks['batch_size'] == b) &
+                                   (benchmarks['intraop_threads'] == t)][yaxis].iloc[0]
+
+            if yaxis == 'latency(avg)':
+                point = point
+            elif yaxis == 'throughput':
+                point = point * instance
+
+            new_row = pd.DataFrame.from_records([{"B": int(batch_size), "i": int(instance), "b": b,
+                                                  "t": int(t), yaxis: int(point)}])
+            data = pd.concat([data, new_row], ignore_index=True)
+
+    data['B'] = data['B'].astype(int)
+    data['B'] = data['B'].astype('category')
+    data['change'] = data[yaxis].astype(int)
+
+    plot = ggplot(data=data, mapping=aes(x='i', y=yaxis, color='B')) + \
+        MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
+        theme(legend_position='top', legend_title=element_blank()) + \
+        ggtitle("Instances vs {}".format(label)) + \
+        scale_x_log10(
+        breaks=data['i'].unique(), labels=["I={}, t={}".format(thr, int(maxthreads/thr)) for thr in data['i'].unique()], name='# Instances') + \
+        scale_y_log10(labels=lambda lst: ["{:.1f}".format(y) for y in lst]) + \
+        scale_color_discrete(breaks=data['B'].unique(), labels=["B={}".format(b) for b in data['B'].unique()]) + \
+        geom_point(size=5) + \
+        geom_text(aes(label='change'), size=13, ha="left", va="bottom") +\
+        geom_line()
+
+    plot.save("{}-{}-multiinstance.png".format(bench, label.lower()),
+              dpi=300, width=12, height=5, verbose=False)
+
+
 class Plots(Enum):
     latency = 1
     throughput = 2
@@ -295,6 +347,7 @@ class PType(Enum):
     flops = 4  # Threads vs GFLOPs/sec
     numa = 5  # Threads vs latency or throughput comparison between sequential and interleaved case
     batch = 6  # Threads vs throughput or latency comparison per thread
+    multiinstance = 7  # Threads vs throughput or latency comparison for multiple instances
     all = 255
 
 
@@ -327,6 +380,8 @@ def plot_latency(df, ptype):
             df, 'latency(avg)', 'Latency')
     elif ptype == PType.batch or ptype == PType.all:
         scaling_plot_per_thread(df, 'latency(avg)', 'Latency')
+    elif ptype == PType.multiinstance or ptype == PType.all:
+        plot_multiinstance_comparison_per_batch(df, 'latency(avg)', 'Latency')
     else:
         raise Exception("Unknown plot type")
 
@@ -344,6 +399,8 @@ def plot_throughput(df, ptype):
             df, 'throughput', 'Throughput')
     elif ptype == PType.batch or ptype == PType.all:
         scaling_plot_per_thread(df, 'throughput', 'Throughput')
+    elif ptype == PType.multiinstance or ptype == PType.all:
+        plot_multiinstance_comparison_per_batch(df, 'throughput', 'Throughput')
     else:
         raise Exception("Unknown plot type")
 
