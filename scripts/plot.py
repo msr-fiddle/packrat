@@ -304,12 +304,13 @@ def plot_multiinstance_comparison_per_batch(benchmarks, yaxis: str, label: str):
             b = batch_size / instance
             point = benchmarks.loc[(benchmarks['topology'] == "sequential") &
                                    (benchmarks['batch_size'] == b) &
-                                   (benchmarks['intraop_threads'] == t)][yaxis].iloc[0]
+                                   (benchmarks['intraop_threads'] == t)][yaxis]
 
             if yaxis == 'latency(avg)':
-                point = point
+                point = max(point)
             elif yaxis == 'throughput':
-                point = point * instance
+                point = sum(point)
+            # print(f"{instance},{b},{t},{point}")
 
             new_row = pd.DataFrame.from_records([{"B": int(batch_size), "i": int(instance), "b": b,
                                                   "t": int(t), yaxis: int(point)}])

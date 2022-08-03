@@ -122,29 +122,32 @@ def run_multi_instances(args: Namespace):
         "socket", core_count, "sequential")
 
     for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
-        for i in [1, 2, 4, 8]:
+        for total_instances in [1, 2, 4, 8]:
             instances, cmd, config = [], [], []
-            cores_per_instance = core_count / i
+            for i in range(total_instances):
+                cores_per_instance = int(core_count / total_instances)
+                batch_per_instance = int(batch_size / total_instances)
 
-            config.append(Config(args))
-            config[i].set_instance_id(i)
-            config[i].set_batch_size(batch_size)
-            config[i].set_intraop_threads(cores_per_instance)
-            config[i].set_core_list(
-                corelist[i*cores_per_instance, (i+1)*cores_per_instance])
+                config.append(Config(args))
+                config[i].set_instance_id(i + 1)
+                config[i].set_batch_size(batch_per_instance)
+                config[i].set_intraop_threads(cores_per_instance)
+                config[i].set_core_list(
+                    corelist[int(i*cores_per_instance):int((i+1)*cores_per_instance)])
 
-            cmd.append([
-                "numactl", "-C {}".format(",".join(str(x)
-                                                   for x in config[i].core_list)),
-                "python3"
-            ])
-            cmd[i].append(f"./benchmarks/{config[i].benchmark.name}.py")
-            cmd[i].append(repr(config[i]))
+                cmd.append([
+                    "numactl", "-C {}".format(",".join(str(x)
+                                                       for x in config[i].core_list)),
+                    "python3"
+                ])
+                cmd[i].append(f"./benchmarks/{config[i].benchmark.name}.py")
+                cmd[i].append(repr(config[i]))
 
-            instances.append(subprocess.Popen(cmd[i], env=os.environ.copy()))
+                instances.append(subprocess.Popen(
+                    cmd[i], env=os.environ.copy()))
 
-        for instance in instances:
-            instance.wait()
+            for instance in instances:
+                instance.wait()
 
 
 if __name__ == '__main__':

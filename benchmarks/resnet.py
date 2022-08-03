@@ -47,7 +47,7 @@ class ResnetBench(implements(Bench)):
 
     def get_test_data(self, batch_size: int) -> torch.Tensor:
         url, filename = (
-            "https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog.jpg")
+            "https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog-{}.jpg".format(config.instance_id))
         try:
             urllib.request.urlretrieve(url, filename)
         except urllib.error.HTTPError:
