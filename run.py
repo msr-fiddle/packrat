@@ -38,7 +38,7 @@ def parse_args():
                       help="The list of cores to pin to")
     args.add_argument("--flops", type=int, default=0,
                       help="The number of flops")
-    args.add_argument("--instances", type=int, default=1,
+    args.add_argument("--instance_id", type=int, default=1,
                       help="The number of instances")
     return args.parse_args()
 
@@ -109,40 +109,39 @@ def run(args: Namespace):
 
 
 def run_multi_instances(args: Namespace):
-    assert args.instances == 2
-    config1 = Config(args)
-    config2 = Config(args)
-    config1.set_instance_id(1)
-    config2.set_instance_id(2)
+    assert args.instance_id != 1, "Instance id must be greater than 1"
 
-    for batch_size in [1, 8, 16, 32]:
-        config1.set_batch_size(batch_size)
-        config2.set_batch_size(batch_size)
+    def lower_power_of_two(x):
+        import math
+        return 2**(math.floor(math.log(x, 2)))
 
-        config1.set_intraop_threads(8)
-        config2.set_intraop_threads(8)
+    topology = CPUInfo()
+    core_count = lower_power_of_two(int(psutil.cpu_count(logical=False) /
+                                        len(topology.get_sockets())))
+    corelist = topology.allocate_cores(
+        "socket", core_count, "sequential")
 
-        config1.set_core_list([0, 1, 2, 3, 4, 5, 6, 7])
-        config2.set_core_list([8, 9, 10, 11, 12, 13, 14, 15])
+    for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
+        for i in [1, 2, 4, 8]:
+            instances, cmd, config = [], [], []
+            cores_per_instance = core_count / i
 
-        instances = []
-        cmd1 = [
-            "numactl", "-C {}".format(",".join(str(x)
-                                               for x in config1.core_list)),
-            "python3"
-        ]
-        cmd2 = [
-            "numactl", "-C {}".format(",".join(str(x)
-                                               for x in config2.core_list)),
-            "python3"
-        ]
-        cmd1.append(f"./benchmarks/{config1.benchmark.name}.py")
-        cmd1.append(repr(config1))
+            config.append(Config(args))
+            config[i].set_instance_id(i)
+            config[i].set_batch_size(batch_size)
+            config[i].set_intraop_threads(cores_per_instance)
+            config[i].set_core_list(
+                corelist[i*cores_per_instance, (i+1)*cores_per_instance])
 
-        cmd2.append(f"./benchmarks/{config2.benchmark.name}.py")
-        cmd2.append(repr(config2))
-        instances.append(subprocess.Popen(cmd1, env=os.environ.copy()))
-        instances.append(subprocess.Popen(cmd2, env=os.environ.copy()))
+            cmd.append([
+                "numactl", "-C {}".format(",".join(str(x)
+                                                   for x in config[i].core_list)),
+                "python3"
+            ])
+            cmd[i].append(f"./benchmarks/{config[i].benchmark.name}.py")
+            cmd[i].append(repr(config[i]))
+
+            instances.append(subprocess.Popen(cmd[i], env=os.environ.copy()))
 
         for instance in instances:
             instance.wait()
@@ -150,7 +149,7 @@ def run_multi_instances(args: Namespace):
 
 if __name__ == '__main__':
     arguments = parse_args()
-    if arguments.instances == 1:
+    if arguments.instance_id == 1:
         run(arguments)
     else:
         run_multi_instances(arguments)

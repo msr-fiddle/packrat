@@ -55,7 +55,7 @@ class Config:
             self.interop_threads = int(args.interop_threads)
             self.intraop_threads = int(args.intraop_threads)
             self.flops = int(args.flops)
-            self.instance_id = 1
+            self.instance_id = int(args.instance_id)
             self.core_list = args.core_list
         else:
             self.benchmark = Benchmark.resnet
@@ -71,7 +71,7 @@ class Config:
             self.core_list = [0]
 
     def __repr__(self):
-        return 'benchmark={}, run_type={}, optimization={}, mapping={}, batch_size={}, iterations={}, interop_threads={}, intraop_threads={}, instance_id={}, flops={}, core_list={}'.format(self.benchmark.name, self.run_type.name, self.optimization.name, self.mapping.name, self.batch_size, self.iterations, self.interop_threads, self.intraop_threads, self.flops, self.instance_id, self.core_list)
+        return 'benchmark={}, run_type={}, optimization={}, mapping={}, batch_size={}, iterations={}, interop_threads={}, intraop_threads={}, flops={}, instance_id={}, core_list={}'.format(self.benchmark.name, self.run_type.name, self.optimization.name, self.mapping.name, self.batch_size, self.iterations, self.interop_threads, self.intraop_threads, self.flops, self.instance_id, self.core_list)
 
     @classmethod
     def from_string(self, string: str):
