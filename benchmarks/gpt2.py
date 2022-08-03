@@ -13,19 +13,23 @@ from config import Benchmark, Config, RunType
 
 class GptBench(implements(Bench)):
     def run(self, config: Config) -> None:
-        model = self.get_model()
+        model = self.get_model(config)
         data = self.get_test_data(config.batch_size)
 
-        model, data = self.optimize_memory_layout(
-            config.optimization, model, data)
+        if config.optimization == "script":
+            model = torch.jit.trace(model, data)
+            model = model.optimize_for_inference()
 
         if config.run_type == RunType.default:
             self.inference_benchmark(config, model, data)
         elif config.run_type == RunType.manual:
             self.inference_manual(config, model, data)
 
-    def get_model(self) -> torch.nn.Module:
-        model = GPT2LMHeadModel.from_pretrained('gpt2')
+    def get_model(self, config: Config) -> torch.nn.Module:
+        if config.optimization == "script":
+            model = GPT2LMHeadModel.from_pretrained('gpt2', torchscript=True)
+        else:
+            model = GPT2LMHeadModel.from_pretrained('gpt2')
         model.eval()
         return model
 

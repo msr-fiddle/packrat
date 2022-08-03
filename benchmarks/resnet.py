@@ -19,8 +19,7 @@ from config import Benchmark, Config, RunType
 
 class ResnetBench(implements(Bench)):
     def run(self, config: Config) -> None:
-        print(config)
-        model = self.get_model()
+        model = self.get_model(config)
         data = self.get_test_data(config.batch_size)
 
         model, data = self.optimize_memory_layout(
@@ -35,7 +34,7 @@ class ResnetBench(implements(Bench)):
         if config.intraop_threads == 1 and config.interop_threads == 1:
             self.measure_flops(config, model, data)
 
-    def get_model(self) -> torch.nn.Module:
+    def get_model(self, config: Config) -> torch.nn.Module:
         model = models.resnet50(pretrained=True)
         model.eval()
         return model

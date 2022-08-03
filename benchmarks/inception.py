@@ -14,7 +14,7 @@ from config import Benchmark, Config, RunType
 
 class InceptionBench(implements(Bench)):
     def run(self, config: Config) -> None:
-        model = self.get_model()
+        model = self.get_model(config)
         data = self.get_test_data(config.batch_size)
 
         model, data = self.optimize_memory_layout(
@@ -25,7 +25,7 @@ class InceptionBench(implements(Bench)):
         elif config.run_type == RunType.manual:
             self.inference_manual(config, model, data)
 
-    def get_model(self) -> torch.nn.Module:
+    def get_model(self, config: Config) -> torch.nn.Module:
         model = models.inception_v3(pretrained=True)
         model.eval()
         return model

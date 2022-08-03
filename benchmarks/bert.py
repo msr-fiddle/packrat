@@ -1,31 +1,37 @@
 # https://huggingface.co/transformers/v1.0.0/quickstart.html
 
-import os
 from sys import argv
 import timeit
 import torch
-from transformers import BertTokenizer, BertModel
+from transformers import BertTokenizer, BertModel, logging
 from interface import implements
 
 from bench import Bench
 from config import Benchmark, Config, RunType
 
+logging.set_verbosity_error()
+
 
 class BertBench(implements(Bench)):
     def run(self, config: Config) -> None:
-        model = self.get_model()
+        model = self.get_model(config)
         data, segments = self.get_test_data(config.batch_size)
 
-        model, data = self.optimize_memory_layout(
-            config.optimization, model, data)
+        if config.optimization == "script":
+            model = torch.jit.trace(model, data)
+            model = model.optimize_for_inference()
 
         if config.run_type == RunType.default:
             self.inference_benchmark(config, model, data)
         elif config.run_type == RunType.manual:
             self.inference_manual(config, model, data, segments)
 
-    def get_model(self) -> torch.nn.Module:
-        model = BertModel.from_pretrained('bert-base-uncased')
+    def get_model(self, config: Config) -> torch.nn.Module:
+        if config.optimization == "script":
+            model = BertModel.from_pretrained(
+                'bert-base-uncased', torchscript=True)
+        else:
+            model = BertModel.from_pretrained('bert-base-uncased')
         model.eval()
         return model
 

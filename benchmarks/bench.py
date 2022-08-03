@@ -18,7 +18,7 @@ class Bench(Interface):
     def run_inference(self, model: torch.nn.Module, data: torch.Tensor):
         pass
 
-    def get_model(self) -> torch.nn.Module:
+    def get_model(self, config: Config) -> torch.nn.Module:
         pass
 
     def get_test_data(self, batch_size: int) -> torch.Tensor:
