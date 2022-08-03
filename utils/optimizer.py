@@ -12,8 +12,8 @@ latency[t',b'] = latency of processing a batch with b' inputs with t' threads (f
 
 
 from io import BytesIO
-import numpy as np
 import urllib.request
+import numpy as np
 import pandas as pd
 
 
@@ -29,17 +29,18 @@ class Optimizer:
         :param benchmark: benchmark type latency or throughput
         :return: dataframe
         """
-        url = "https://msr-fiddle.github.io/naf/resnet/skylake2x/large-batches/{}_{}.csv".format(
-            model, benchmark)
-        print(" > Fetching {} ...".format(url), end='')
+        base = "https://msr-fiddle.github.io/naf"
+        url = f"{base}/{model}/skylake2x/large-batches/{model}_{benchmark}.csv"
+        print(url)
+        print(f" > Fetching {url} ...", end='')
         try:
-            response = urllib.request.urlopen(url)
-            print("OK (%d)." % response.getcode())
-        except urllib.error.HTTPError as e:
-            print("FAILED (%d)." % e.code)
+            with urllib.request.urlopen(url) as response:
+                print(f"OK ({response.getcode()}).")
+                data = pd.read_csv(BytesIO(response.read()))
+                return data
+        except urllib.error.HTTPError as error:
+            print(f"FAILED ({error.code}).")
             return None
-        buf = BytesIO(response.read())
-        return pd.read_csv(buf)
 
     def format_data(self, data):
         """
@@ -49,16 +50,17 @@ class Optimizer:
         """
         data = data.loc[:, ["intraop_threads", "batch_size", "latency(avg)"]]
 
-        latencies = [[0.0 for i in range(len(data.batch_size.unique()) + 1)]]
-        for t in data.intraop_threads.unique():
-            batch_latencies = [0]
-            for b in data.batch_size.unique():
-                latency = data.loc[(data["intraop_threads"] == t) &
-                                   (data["batch_size"] == b)]["latency(avg)"].values[0]
-                batch_latencies.append(latency)
-            latencies.append(batch_latencies)
+        latencies = {}
+        for thread in data.intraop_threads.unique():
+            batch_latencies = {}
+            for batch in data.batch_size.unique():
+                latency = data.loc[(data["intraop_threads"] == thread) &
+                                   (data["batch_size"] == batch)]["latency(avg)"].values[0]
+                batch_latencies[batch] = latency
 
-        return np.array(latencies, dtype=np.float32)
+            latencies[thread] = batch_latencies
+
+        return latencies
 
     def __init__(self):
         """Initialize the optimizer."""
@@ -73,20 +75,21 @@ class Optimizer:
         :return: optimial latency matrix
         """
 
-        opt = [[0 for _ in range(max_batch + 1)]
+        opt = [[float('inf') for _ in range(max_batch + 1)]
                for _ in range(max_threads + 1)]
-        assert latency.shape == (max_threads + 1, max_batch + 1)
-
-        for batch in range(1, max_batch + 1):
-            opt[0][batch] = float('inf')
 
         for thread in range(1, max_threads + 1):
             for batch in range(1, max_batch + 1):
-                opt[thread][batch] = float('inf')
                 for t_i in range(1, thread + 1):
                     for b_i in range(1, batch + 1):
-                        opt[thread][batch] = min(opt[thread][batch], opt[thread - t_i]
-                                                 [batch - b_i] + latency[t_i][b_i])
+                        if t_i in latency and b_i in latency[t_i]:
+                            opt[thread][batch] = min(opt[thread][batch],
+                                                     max(opt[thread - t_i][batch - b_i],
+                                                         latency[t_i][b_i])
+                                                     )
+                        if thread in latency and batch in latency[thread]:
+                            opt[thread][batch] = min(
+                                opt[thread][batch], latency[thread][batch])
 
         # print(f"latency { latency}")
         # print(f"opt { np.array(opt)}")
@@ -98,6 +101,5 @@ if __name__ == "__main__":
     assert optimizer.min_latency(
         3, 3, np.array([[0, 0, 0, 0], [0, 7, 8, 9], [0, 4, 5, 6], [0, 1, 2, 3]])) == 3
 
-    shape = optimizer.latencies.shape
-    print(optimizer.min_latency(shape[0] - 1,
-          shape[1] - 1, optimizer.latencies))
+    print(optimizer.min_latency(16,
+          16, optimizer.latencies))
