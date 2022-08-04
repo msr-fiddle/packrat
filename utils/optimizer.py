@@ -92,14 +92,37 @@ class Optimizer:
                                 opt[thread][batch], latency[thread][batch])
 
         # print(f"latency { latency}")
-        # print(f"opt { np.array(opt)}")
-        return opt[max_threads][max_batch]
+        # np.set_printoptions(linewidth=np.inf)
+        # print(f"opt { np.array(opt, dtype=np.float16)}")
+        return opt
+
+    def solution(self, threads, batch, latency, opt, result):
+        if threads <= 0 or batch <= 0:
+            return 0
+
+        max_threads, max_batch = 0, 0
+        for t in range(threads, 0, -1):
+            for b in range(batch, 0, -1):
+                if t in latency and b in latency[t]:
+                    if opt[threads][batch] == opt[t][b] == latency[t][b]:
+                        max_threads, max_batch = threads - t, batch - b
+                        result.append((t, b))
+                        break
+
+        return self.solution(max_threads, max_batch, latency, opt, result)
 
 
 if __name__ == "__main__":
     optimizer = Optimizer()
     assert optimizer.min_latency(
-        3, 3, np.array([[0, 0, 0, 0], [0, 7, 8, 9], [0, 4, 5, 6], [0, 1, 2, 3]])) == 3
+        3, 3, np.array([[0, 0, 0, 0], [0, 7, 8, 9], [0, 4, 5, 6], [0, 1, 2, 3]]))[3][3] == 3
 
-    print(optimizer.min_latency(16,
-          16, optimizer.latencies))
+    max_threads = max(optimizer.latencies.keys())
+    max_batch = max(optimizer.latencies[max_threads].keys())
+    opt = optimizer.min_latency(
+        max_threads, max_batch, optimizer.latencies)
+
+    instances = []
+    optimizer.solution(max_threads, max_batch,
+                       optimizer.latencies, opt, instances)
+    print(instances)
