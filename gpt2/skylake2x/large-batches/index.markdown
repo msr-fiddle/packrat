@@ -22,7 +22,8 @@ title:  "GPT-2"
 
 ## Latency Per Optimization
 <p float="left">
-<img src="./gpt2-latency-none.png" alt="GPT-2 Latency Opt=Script" width="100%"/>
+<img src="./gpt2-latency-none.png" alt="GPT-2 Latency Opt=None" width="100%"/>
+<img src="./gpt2-latency-script.png" alt="GPT-2 Latency Opt=Script" width="100%"/>
 </p>
 
 # Throughput
@@ -43,16 +44,20 @@ title:  "GPT-2"
 
 ## Throughput Per Optimization
 <p float="left">
-<img src="./gpt2-throughput-none.png" alt="GPT-2 Latency Opt=Script" width="100%"/>
+<img src="./gpt2-throughput-none.png" alt="GPT-2 Latency Opt=None" width="100%"/>
+<img src="./gpt2-throughput-script.png" alt="GPT-2 Latency Opt=Script" width="100%"/>
 </p>
+
 
 ## Speedup
 <p float="left">
-<img src="./gpt2-throughput-speedup-none.png" alt="GPT-2 Latency Opt=Script" width="100%"/>
+<img src="./gpt2-throughput-speedup-none.png" alt="GPT-2 Latency Opt=None" width="100%"/>
+<img src="./gpt2-throughput-speedup-script.png" alt="GPT-2 Latency Opt=Script" width="100%"/>
 </p>
 
 ## Throughput Per Batch
 <p float="left">
 <img src="./gpt2-throughput-none-perBS.png" alt="GPT-2 Throughput per BS" width="100%"/>
+<img src="./gpt2-throughput-script-perBS.png" alt="GPT-2 Throughput per BS" width="100%"/>
 </p>
 
