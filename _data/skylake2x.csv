@@ -6,4 +6,4 @@ date,revision,path,resnetbench,inceptionbench,gptbench,bertbench
 2022-07-20,numa-interleave,,index.html
 2022-07-20,numa-interleave-no-omp,,index.html
 2022-07-28,flops,,index.html
-2022-07-29,large-batches,,index.html,index.html,index.html
+2022-07-29,large-batches,,index.html,index.html,index.html, index.html
