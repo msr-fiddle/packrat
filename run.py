@@ -13,7 +13,7 @@ from argparse import ArgumentParser, Namespace
 import psutil
 from utils.topology import CPUInfo
 
-from benchmarks.config import Benchmark, Optimizations, RunType, Config, ThreadMapping
+from benchmarks.config import Benchmark, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
 
 
 def parse_args():
@@ -40,6 +40,8 @@ def parse_args():
                       help="The number of flops")
     args.add_argument("--instance_id", type=int, default=1,
                       help="The number of instances")
+    args.add_argument("--pinning", type=str, default=ThreadPinning.numactl.name,
+                      help="The thread pinning scheme")
     return args.parse_args()
 
 
@@ -60,19 +62,23 @@ def run_with_parameters(config: Config):
     cmd = []
     if config.run_type == RunType.manual:
         proclist = config.core_list
-        # Static division of work among threads
-        set_env(myenv, "OMP_SCHEDULE", "STATIC")
-        # Schedule the thread near to the parent thread
-        set_env(myenv, "OMP_PROC_BIND", "CLOSE")
-        set_env(myenv, "KMP_AFFINITY",
-                f"granularity=fine,proclist={proclist},explicit")
+        cmd = []
 
-        cmd = [
-            "numactl", "-C {}".format(",".join(str(x)
-                                               for x in proclist)),
-            "python3"
-        ]
+        if config.pinnning.name == "numactl":
+            cmd = ["numactl"]
+            cmd.append("-C {}".format(",".join(str(x)
+                                               for x in proclist)))
+        elif config.pinnning.name == "omp":
+            # Static division of work among threads
+            set_env(myenv, "OMP_SCHEDULE", "STATIC")
+            # Schedule the thread near to the parent thread
+            set_env(myenv, "OMP_PROC_BIND", "CLOSE")
+            set_env(myenv, "KMP_AFFINITY",
+                    f"granularity=fine,proclist={proclist},explicit")
+        else:
+            cmd = []
 
+    cmd.append("python3")
     cmd.append(f"./benchmarks/{config.benchmark.name}.py")
     cmd.append(repr(config))
     logging.info("Running: %s", " ".join(cmd))
