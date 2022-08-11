@@ -3,6 +3,8 @@ layout: scalebench
 title:  "ResNet50"
 ---
 
+[NUMA Effects](#numa-effects)
+
 # Latency (Sequential)
 
 ## Latency Per Batch
@@ -73,6 +75,21 @@ title:  "ResNet50"
 <img src="./resnet-latency-numa-1024.png" alt="ResNet Latency BS=1024" width="100%"/>
 </p>
 
+## % Latency Loss Per Batch
+<p float="left">
+<img src="./resnet-latency-ratio-1.png" alt="ResNet Latency BS=1" width="100%"/>
+<img src="./resnet-latency-ratio-2.png" alt="ResNet Latency BS=2" width="100%"/>
+<img src="./resnet-latency-ratio-4.png" alt="ResNet Latency BS=4" width="100%"/>
+<img src="./resnet-latency-ratio-8.png" alt="ResNet Latency BS=8" width="100%"/>
+<img src="./resnet-latency-ratio-16.png" alt="ResNet Latency BS=16" width="100%"/>
+<img src="./resnet-latency-ratio-32.png" alt="ResNet Latency BS=32" width="100%"/>
+<img src="./resnet-latency-ratio-64.png" alt="ResNet Latency BS=64" width="100%"/>
+<img src="./resnet-latency-ratio-128.png" alt="ResNet Latency BS=128" width="100%"/>
+<img src="./resnet-latency-ratio-256.png" alt="ResNet Latency BS=256" width="100%"/>
+<img src="./resnet-latency-ratio-512.png" alt="ResNet Latency BS=512" width="100%"/>
+<img src="./resnet-latency-ratio-1024.png" alt="ResNet Latency BS=1024" width="100%"/>
+</p>
+
 ## Throughput Per Batch
 <p float="left">
 <img src="./resnet-throughput-numa-1.png" alt="ResNet Throughput BS=1" width="100%"/>
@@ -86,4 +103,19 @@ title:  "ResNet50"
 <img src="./resnet-throughput-numa-256.png" alt="ResNet Throughput BS=256" width="100%"/>
 <img src="./resnet-throughput-numa-512.png" alt="ResNet Throughput BS=512" width="100%"/>
 <img src="./resnet-throughput-numa-1024.png" alt="ResNet Throughput BS=1024" width="100%"/>
+</p>
+
+## % Throughput Loss Per Batch
+<p float="left">
+<img src="./resnet-throughput-ratio-1.png" alt="ResNet Throughput BS=1" width="100%"/>
+<img src="./resnet-throughput-ratio-2.png" alt="ResNet Throughput BS=2" width="100%"/>
+<img src="./resnet-throughput-ratio-4.png" alt="ResNet Throughput BS=4" width="100%"/>
+<img src="./resnet-throughput-ratio-8.png" alt="ResNet Throughput BS=8" width="100%"/>
+<img src="./resnet-throughput-ratio-16.png" alt="ResNet Throughput BS=16" width="100%"/>
+<img src="./resnet-throughput-ratio-32.png" alt="ResNet Throughput BS=32" width="100%"/>
+<img src="./resnet-throughput-ratio-64.png" alt="ResNet Throughput BS=64" width="100%"/>
+<img src="./resnet-throughput-ratio-128.png" alt="ResNet Throughput BS=128" width="100%"/>
+<img src="./resnet-throughput-ratio-256.png" alt="ResNet Throughput BS=256" width="100%"/>
+<img src="./resnet-throughput-ratio-512.png" alt="ResNet Throughput BS=512" width="100%"/>
+<img src="./resnet-throughput-ratio-1024.png" alt="ResNet Throughput BS=1024" width="100%"/>
 </p>
