@@ -9,10 +9,6 @@
 # vscode
 **/.vscode
 
-# data and plots
-**/*.csv
-**/*.png
-
 # Configuration files
 **/*.json
 
