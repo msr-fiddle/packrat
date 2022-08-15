@@ -56,3 +56,19 @@ title:  "Inception"
 <img src="./inception-throughput-script-perBS.png" alt="Inception Throughput per BS" width="100%"/>
 </p>
 
+# NUMA-Effects
+
+## Latency Per Batch
+<p float="left">
+<img src="./inception-latency-numa-1.png" alt="inception Latency BS=1" width="100%"/>
+<img src="./inception-latency-numa-2.png" alt="inception Latency BS=2" width="100%"/>
+<img src="./inception-latency-numa-4.png" alt="inception Latency BS=4" width="100%"/>
+<img src="./inception-latency-numa-8.png" alt="inception Latency BS=8" width="100%"/>
+<img src="./inception-latency-numa-16.png" alt="inception Latency BS=16" width="100%"/>
+<img src="./inception-latency-numa-32.png" alt="inception Latency BS=32" width="100%"/>
+<img src="./inception-latency-numa-64.png" alt="inception Latency BS=64" width="100%"/>
+<img src="./inception-latency-numa-128.png" alt="inception Latency BS=128" width="100%"/>
+<img src="./inception-latency-numa-256.png" alt="inception Latency BS=256" width="100%"/>
+<img src="./inception-latency-numa-512.png" alt="inception Latency BS=512" width="100%"/>
+<img src="./inception-latency-numa-1024.png" alt="inception Latency BS=1024" width="100%"/>
+</p>
