@@ -3,7 +3,9 @@ layout: scalebench
 title:  "Inception"
 ---
 
-# Latency
+[NUMA Effects](#numa-effects)
+
+# Latency (Sequential)
 
 ## Latency Per Batch
 <p float="left">
@@ -25,7 +27,7 @@ title:  "Inception"
 <img src="./inception-latency-script.png" alt="Inception Latency Opt=Script" width="100%"/>
 </p>
 
-# Throughput
+# Throughput (Sequential)
 ## Throughput Per Batch
 <p float="left">
 <img src="./inception-throughput-1.png" alt="Inception Throughput BS=1" width="100%"/>
@@ -60,15 +62,60 @@ title:  "Inception"
 
 ## Latency Per Batch
 <p float="left">
-<img src="./inception-latency-numa-1.png" alt="inception Latency BS=1" width="100%"/>
-<img src="./inception-latency-numa-2.png" alt="inception Latency BS=2" width="100%"/>
-<img src="./inception-latency-numa-4.png" alt="inception Latency BS=4" width="100%"/>
-<img src="./inception-latency-numa-8.png" alt="inception Latency BS=8" width="100%"/>
-<img src="./inception-latency-numa-16.png" alt="inception Latency BS=16" width="100%"/>
-<img src="./inception-latency-numa-32.png" alt="inception Latency BS=32" width="100%"/>
-<img src="./inception-latency-numa-64.png" alt="inception Latency BS=64" width="100%"/>
-<img src="./inception-latency-numa-128.png" alt="inception Latency BS=128" width="100%"/>
-<img src="./inception-latency-numa-256.png" alt="inception Latency BS=256" width="100%"/>
-<img src="./inception-latency-numa-512.png" alt="inception Latency BS=512" width="100%"/>
-<img src="./inception-latency-numa-1024.png" alt="inception Latency BS=1024" width="100%"/>
+<img src="./inception-latency-numa-1.png" alt="Inception Latency BS=1" width="100%"/>
+<img src="./inception-latency-numa-2.png" alt="Inception Latency BS=2" width="100%"/>
+<img src="./inception-latency-numa-4.png" alt="Inception Latency BS=4" width="100%"/>
+<img src="./inception-latency-numa-8.png" alt="Inception Latency BS=8" width="100%"/>
+<img src="./inception-latency-numa-16.png" alt="Inception Latency BS=16" width="100%"/>
+<img src="./inception-latency-numa-32.png" alt="Inception Latency BS=32" width="100%"/>
+<img src="./inception-latency-numa-64.png" alt="Inception Latency BS=64" width="100%"/>
+<img src="./inception-latency-numa-128.png" alt="Inception Latency BS=128" width="100%"/>
+<img src="./inception-latency-numa-256.png" alt="Inception Latency BS=256" width="100%"/>
+<img src="./inception-latency-numa-512.png" alt="Inception Latency BS=512" width="100%"/>
+<img src="./inception-latency-numa-1024.png" alt="Inception Latency BS=1024" width="100%"/>
+</p>
+
+## % Latency Loss Per Batch
+<p float="left">
+<img src="./inception-latency-ratio-1.png" alt="Inception Latency BS=1" width="100%"/>
+<img src="./inception-latency-ratio-2.png" alt="Inception Latency BS=2" width="100%"/>
+<img src="./inception-latency-ratio-4.png" alt="Inception Latency BS=4" width="100%"/>
+<img src="./inception-latency-ratio-8.png" alt="Inception Latency BS=8" width="100%"/>
+<img src="./inception-latency-ratio-16.png" alt="Inception Latency BS=16" width="100%"/>
+<img src="./inception-latency-ratio-32.png" alt="Inception Latency BS=32" width="100%"/>
+<img src="./inception-latency-ratio-64.png" alt="Inception Latency BS=64" width="100%"/>
+<img src="./inception-latency-ratio-128.png" alt="Inception Latency BS=128" width="100%"/>
+<img src="./inception-latency-ratio-256.png" alt="Inception Latency BS=256" width="100%"/>
+<img src="./inception-latency-ratio-512.png" alt="Inception Latency BS=512" width="100%"/>
+<img src="./inception-latency-ratio-1024.png" alt="Inception Latency BS=1024" width="100%"/>
+</p>
+
+## Throughput Per Batch
+<p float="left">
+<img src="./inception-throughput-numa-1.png" alt="Inception Throughput BS=1" width="100%"/>
+<img src="./inception-throughput-numa-2.png" alt="Inception Throughput BS=2" width="100%"/>
+<img src="./inception-throughput-numa-4.png" alt="Inception Throughput BS=4" width="100%"/>
+<img src="./inception-throughput-numa-8.png" alt="Inception Throughput BS=8" width="100%"/>
+<img src="./inception-throughput-numa-16.png" alt="Inception Throughput BS=16" width="100%"/>
+<img src="./inception-throughput-numa-32.png" alt="Inception Throughput BS=32" width="100%"/>
+<img src="./inception-throughput-numa-64.png" alt="Inception Throughput BS=64" width="100%"/>
+<img src="./inception-throughput-numa-128.png" alt="Inception Throughput BS=128" width="100%"/>
+<img src="./inception-throughput-numa-256.png" alt="Inception Throughput BS=256" width="100%"/>
+<img src="./inception-throughput-numa-512.png" alt="Inception Throughput BS=512" width="100%"/>
+<img src="./inception-throughput-numa-1024.png" alt="Inception Throughput BS=1024" width="100%"/>
+</p>
+
+## % Throughput Loss Per Batch
+<p float="left">
+<img src="./inception-throughput-ratio-1.png" alt="Inception Throughput BS=1" width="100%"/>
+<img src="./inception-throughput-ratio-2.png" alt="Inception Throughput BS=2" width="100%"/>
+<img src="./inception-throughput-ratio-4.png" alt="Inception Throughput BS=4" width="100%"/>
+<img src="./inception-throughput-ratio-8.png" alt="Inception Throughput BS=8" width="100%"/>
+<img src="./inception-throughput-ratio-16.png" alt="Inception Throughput BS=16" width="100%"/>
+<img src="./inception-throughput-ratio-32.png" alt="Inception Throughput BS=32" width="100%"/>
+<img src="./inception-throughput-ratio-64.png" alt="Inception Throughput BS=64" width="100%"/>
+<img src="./inception-throughput-ratio-128.png" alt="Inception Throughput BS=128" width="100%"/>
+<img src="./inception-throughput-ratio-256.png" alt="Inception Throughput BS=256" width="100%"/>
+<img src="./inception-throughput-ratio-512.png" alt="Inception Throughput BS=512" width="100%"/>
+<img src="./inception-throughput-ratio-1024.png" alt="Inception Throughput BS=1024" width="100%"/>
 </p>
