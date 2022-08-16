@@ -72,7 +72,7 @@ def scaling_plot_per_batch(benchmarks, yaxis: str, label: str):
 
         plot = ggplot(data=data, mapping=aes(x='intraop_threads', y=yaxis, color='config')) + \
             MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
-            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
+            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=0.0) + \
             ggtitle("Threads vs {} (BS={})".format(label, batch_size)) + \
             scale_x_continuous(
                 breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
@@ -116,7 +116,7 @@ def scaling_plot_per_opt(benchmarks, yaxis: str, label: str):
 
         plot = ggplot(data=data, mapping=aes(x='intraop_threads', y=yaxis, color='config')) + \
             MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
-            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
+            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=0.0) + \
             ggtitle("Threads vs {} (Opt={})".format(label, opt.upper())) + \
             scale_x_continuous(
                 breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
@@ -224,7 +224,7 @@ def plot_throughput_scaleup(benchmarks):
         plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='speedup', color='config')) + \
             MyTheme(base_size=10) + \
             labs(y="Speedup") + \
-            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
+            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=0.0) + \
             ggtitle("Throughput Speedup (Opt={})".format(opt.upper())) + \
             scale_x_continuous(
                 breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
@@ -257,6 +257,8 @@ def plot_sequential_and_interleaved_comparison_per_batch(benchmarks, yaxis: str,
         for name in benchmarks.benchmark.unique():
             for topo in benchmarks['topology'].unique():
                 opt = name.split('_')[2].upper()
+                if opt != "SCRIPT":
+                    continue
                 bench = name.split('_')[0]
                 benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
                                            (benchmarks['batch_size'] == batch_size) &
@@ -269,7 +271,7 @@ def plot_sequential_and_interleaved_comparison_per_batch(benchmarks, yaxis: str,
 
         plot = ggplot(data=data, mapping=aes(x='intraop_threads', y=yaxis, color='config')) + \
             MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
-            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=-0.35) + \
+            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=0.0) + \
             ggtitle("Threads vs {} (BS={})".format(label, batch_size)) + \
             scale_x_continuous(
                 breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
@@ -280,6 +282,72 @@ def plot_sequential_and_interleaved_comparison_per_batch(benchmarks, yaxis: str,
             geom_line()
 
         plot.save("{}-{}-numa-{}.png".format(bench, label.lower(), batch_size), dpi=300,
+                  width=12, height=5, verbose=False)
+
+
+def plot_sequential_and_interleaved_ratio_per_batch(benchmarks, yaxis: str, label: str):
+    "Plotting sequential and interleaved comparison per batch"
+
+    if yaxis not in ['latency(avg)', 'throughput']:
+        print("Invalid y-axis: {}".format(yaxis))
+        sys.exit(1)
+
+    ylabel = ""
+    if yaxis == 'latency(avg)':
+        ylabel = "% Latency Loss"
+    elif yaxis == 'throughput':
+        ylabel = "% Throughput Loss"
+
+    topologies = benchmarks['topology'].unique()
+    if len(topologies) != 2:
+        print("Not enough topologies to compare")
+        return
+
+    for batch_size in benchmarks['batch_size'].unique():
+        data_set = []
+        for threads in benchmarks['intraop_threads'].unique():
+            for name in benchmarks.benchmark.unique():
+                opt = name.split('_')[2].upper()
+                if opt != "SCRIPT":
+                    continue
+                bench = name.split('_')[0]
+                benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
+                                           (benchmarks['batch_size'] == batch_size) &
+                                           (benchmarks['intraop_threads'] == threads)]
+
+                topology_sequential = benchmark.loc[benchmark['topology']
+                                                    == 'sequential'][yaxis].iloc[0]
+                topology_interleaved = benchmark.loc[benchmark['topology']
+                                                     == 'interleave'][yaxis].iloc[0]
+                if yaxis == 'latency(avg)':
+                    loss = int(((topology_interleaved - topology_sequential) /
+                                topology_sequential) * 100)
+                elif yaxis == 'throughput':
+                    loss = int(((topology_sequential - topology_interleaved) /
+                                topology_sequential) * 100)
+                new_row = pd.DataFrame.from_records([{
+                    "batch_size": int(batch_size),
+                    "intraop_threads": int(threads),
+                    "sequential": topology_sequential,
+                    "interleave": topology_interleaved,
+                    "loss": loss
+                }])
+                data_set.append(new_row)
+
+        data = pd.concat(data_set)
+
+        plot = ggplot(data=data, mapping=aes(x='intraop_threads', y='loss')) + \
+            MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
+            theme(legend_position='top', legend_title=element_blank(), legend_box_spacing=0.0) + \
+            ggtitle("Threads vs {} (BS={})".format(label, batch_size)) + \
+            scale_x_continuous(
+                breaks=data['intraop_threads'].unique(), labels=["{}".format(thr) for thr in data['intraop_threads'].unique()], name='# threads') + \
+            scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
+            geom_point() + \
+            geom_text(aes(label='loss'), size=13, ha="left", va="bottom") + \
+            geom_line()
+
+        plot.save("{}-{}-ratio-{}.png".format(bench, label.lower(), batch_size), dpi=300,
                   width=12, height=5, verbose=False)
 
 
@@ -379,6 +447,8 @@ def plot_latency(df, ptype):
     elif ptype == PType.numa or ptype == PType.all:
         plot_sequential_and_interleaved_comparison_per_batch(
             df, 'latency(avg)', 'Latency')
+        plot_sequential_and_interleaved_ratio_per_batch(
+            df, 'latency(avg)', 'Latency')
     elif ptype == PType.batch or ptype == PType.all:
         scaling_plot_per_thread(df, 'latency(avg)', 'Latency')
     elif ptype == PType.multiinstance or ptype == PType.all:
@@ -397,6 +467,8 @@ def plot_throughput(df, ptype):
         plot_throughput_scaleup(df)
     elif ptype == PType.numa or ptype == PType.all:
         plot_sequential_and_interleaved_comparison_per_batch(
+            df, 'throughput', 'Throughput')
+        plot_sequential_and_interleaved_ratio_per_batch(
             df, 'throughput', 'Throughput')
     elif ptype == PType.batch or ptype == PType.all:
         scaling_plot_per_thread(df, 'throughput', 'Throughput')
