@@ -12,6 +12,7 @@ import subprocess
 from argparse import ArgumentParser, Namespace
 import psutil
 from utils.topology import CPUInfo
+from utils.optimizer import Optimizer
 
 from benchmarks.config import Benchmark, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
 
@@ -127,33 +128,40 @@ def run_multi_instances(args: Namespace):
     corelist = topology.allocate_cores(
         "socket", core_count, "sequential")
 
+    optimizer = Optimizer()
     for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
-        for total_instances in [1, 2, 4, 8]:
-            instances, cmd, config = [], [], []
-            for i in range(total_instances):
-                cores_per_instance = int(core_count / total_instances)
-                batch_per_instance = int(batch_size / total_instances)
+        optimal_instances = []
+        optimizer.solution(core_count, batch_size,
+                           args.benchmark, optimal_instances)
 
-                config.append(Config(args))
-                config[i].set_instance_id(i + 1)
-                config[i].set_batch_size(batch_per_instance)
-                config[i].set_intraop_threads(cores_per_instance)
-                config[i].set_core_list(
-                    corelist[int(i*cores_per_instance):int((i+1)*cores_per_instance)])
+        total_instances = len(optimal_instances)
+        instances, cmd, config = [], [], []
+        starting_core = 0
+        for i in range(total_instances):
+            cores_per_instance = optimal_instances[i][0]
+            batch_per_instance = optimal_instances[i][1]
 
-                cmd.append([
-                    "numactl", "-C {}".format(",".join(str(x)
-                                                       for x in config[i].core_list)),
-                    "python3"
-                ])
-                cmd[i].append(f"./benchmarks/{config[i].benchmark.name}.py")
-                cmd[i].append(repr(config[i]))
+            config.append(Config(args))
+            config[i].set_instance_id(i + 1)
+            config[i].set_batch_size(batch_per_instance)
+            config[i].set_intraop_threads(cores_per_instance)
+            config[i].set_core_list(
+                corelist[starting_core:starting_core + cores_per_instance])
+            starting_core += cores_per_instance
 
-                instances.append(subprocess.Popen(
-                    cmd[i], env=os.environ.copy()))
+            cmd.append([
+                "numactl", "-C {}".format(",".join(str(x)
+                                                   for x in config[i].core_list)),
+                "python3"
+            ])
+            cmd[i].append(f"./benchmarks/{config[i].benchmark.name}.py")
+            cmd[i].append(repr(config[i]))
 
-            for instance in instances:
-                instance.wait()
+            instances.append(subprocess.Popen(
+                cmd[i], env=os.environ.copy()))
+
+        for instance in instances:
+            instance.wait()
 
 
 if __name__ == '__main__':
