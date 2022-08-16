@@ -44,14 +44,16 @@ def format_data(data):
     :param data: dataframe
     :return: matrix
     """
-    data = data.loc[:, ["intraop_threads", "batch_size", "latency(avg)"]]
+    data = data.loc[:, ["topology", "intraop_threads",
+                        "batch_size", "latency(avg)"]]
 
     latencies = {}
     for thread in data.intraop_threads.unique():
         batch_latencies = {}
         for batch in data.batch_size.unique():
             latency = data.loc[(data["intraop_threads"] == thread) &
-                               (data["batch_size"] == batch)]["latency(avg)"].values[0]
+                               (data["batch_size"] == batch) &
+                               (data["topology"] == "sequential")]["latency(avg)"].values[0]
             batch_latencies[batch] = latency
 
         latencies[thread] = batch_latencies
