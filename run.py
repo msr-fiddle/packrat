@@ -130,6 +130,15 @@ def run_multi_instances(args: Namespace):
 
     optimizer = Optimizer()
     for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
+        single_instance_config = Config(args)
+        single_instance_config.set_instance_id(1)
+        single_instance_config.set_mapping(single_instance_config.mapping)
+        single_instance_config.set_core_list(corelist)
+        single_instance_config.set_interop_threads(1)
+        single_instance_config.set_intraop_threads(core_count)
+        single_instance_config.set_batch_size(batch_size)
+        run_with_parameters(single_instance_config)
+
         optimal_instances = []
         optimizer.solution(core_count, batch_size,
                            args.benchmark, optimal_instances)
@@ -158,7 +167,7 @@ def run_multi_instances(args: Namespace):
             cmd[i].append(repr(config[i]))
 
             instances.append(subprocess.Popen(
-                cmd[i], env=os.environ.copy()))
+                cmd[i], env=os.environ.copy(), stdout=subprocess.DEVNULL))
 
         for instance in instances:
             instance.wait()
