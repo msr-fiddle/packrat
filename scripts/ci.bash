@@ -13,7 +13,7 @@ export CSV_LINE="`date +%Y-%m-%d`",${GIT_REV_CURRENT},"","index.html"
 
 # Check that we can checkout gh-pages early:
 rm -rf gh-pages
-git clone --depth 1 git@github.com:msr-fiddle/numa-aware-frameworks.git -b gh-pages gh-pages
+git clone git@github.com:msr-fiddle/numa-aware-frameworks.git -b gh-pages gh-pages
 pip3 install -r gh-pages/requirements.txt
 
 # plot the data

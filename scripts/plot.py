@@ -66,7 +66,7 @@ def scaling_plot_per_batch(benchmarks, yaxis: str, label: str):
                                        (benchmarks['batch_size'] == batch_size) &
                                        (benchmarks['topology'] == "sequential")]
             benchmark.insert(0, 'config', "opt={}".format(opt))
-            benchmark['change'] = benchmark[yaxis].astype(int)
+            benchmark.insert(0, 'change', benchmark[yaxis].astype(int))
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
@@ -110,7 +110,7 @@ def scaling_plot_per_opt(benchmarks, yaxis: str, label: str):
                                        (benchmarks['batch_size'] == batch_size) &
                                        (benchmarks['topology'] == "sequential")]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
-            benchmark['change'] = benchmark[yaxis].astype(int)
+            benchmark.insert(0, 'change', benchmark[yaxis].astype(int))
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
@@ -153,7 +153,7 @@ def scaling_plot_per_thread(benchmarks, yaxis: str, label: str):
                                        (benchmarks['intraop_threads'] == intraop_threads) &
                                        (benchmarks['topology'] == "sequential")]
             benchmark.insert(0, 'config', "Threads={}".format(intraop_threads))
-            benchmark['change'] = benchmark[yaxis].astype(int)
+            benchmark.insert(0, 'change', benchmark[yaxis].astype(int))
             data_set.append(benchmark)
     data = pd.concat(data_set)
 
@@ -216,8 +216,8 @@ def plot_throughput_scaleup(benchmarks):
                                        (benchmarks['batch_size'] == batch_size) &
                                        (benchmarks['topology'] == "sequential")]
             benchmark.insert(0, 'config', "Batch={}".format(batch_size))
-            benchmark['speedup'] = (
-                benchmark['throughput'] / benchmark['throughput'].iloc[0]).round(1)
+            benchmark.insert(
+                0, 'speedup', (benchmark['throughput'] / benchmark['throughput'].iloc[0]).round(1))
             data_set.append(benchmark)
         data = pd.concat(data_set)
 
@@ -265,7 +265,7 @@ def plot_sequential_and_interleaved_comparison_per_batch(benchmarks, yaxis: str,
                                            (benchmarks['topology'] == topo)]
                 benchmark.insert(
                     0, 'config', "opt={},topo={}".format(opt, topo))
-                benchmark['change'] = benchmark[yaxis].astype(int)
+                benchmark.insert(0, 'change', benchmark[yaxis].astype(int))
                 data_set.append(benchmark)
         data = pd.concat(data_set)
 

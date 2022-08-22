@@ -29,9 +29,9 @@ install_vtune() {
 
 install_torch() {
     python3 -m pip install psutil
-    pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
-    pip3 install transformers python-interface
-    pip3 install pandas plotnine
+    python3 -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+    python3 -m pip install transformers python-interface
+    python3 -m pip install pandas plotnine
 }
 
 install_deps() {
@@ -41,6 +41,10 @@ install_deps() {
     $APT install numactl $APPEND
     $APT install gcc python3-dev $APPEND
     $APT install make build-essential $APPEND
+
+    # PAPI related deps
+    $APT install papi-tools $APPEND
+    python3 -m pip install python_papi
 }
 
 # Check the number of arguments

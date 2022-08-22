@@ -16,3 +16,5 @@
 # Configuration files
 **/*.json
 
+# result branch
+**/gh-pages/
