@@ -4,7 +4,31 @@ layout: default
 
 <div class="home">
 
-  <h1 class="page-heading">Benchmarks Skylake (2 socket)</h1>
+  <h1 class="page-heading">Benchmarks Cloudlab Server (2 socket)</h1>
+
+  <ul class="post-list">
+    {% for post in site.data.cloudlab %}
+    <li>
+      <h2>
+        {{ post.date }} {{ post.revision }}<br>
+        {% if post.resnetbench %}
+        <a href="{{ site.baseurl }}resnet/cloudlab/{{ post.revision }}/{{ post.resnetbench }}">ResNet50</a>
+        {% endif %}
+        {% if post.inceptionbench %}
+        <a href="{{ site.baseurl }}inception/cloudlab/{{ post.revision }}/{{ post.inceptionbench }}">Inception</a>
+        {% endif %}
+        {% if post.gptbench %}
+        <a href="{{ site.baseurl }}gpt2/cloudlab/{{ post.revision }}/{{ post.gptbench }}">GPT2</a>
+        {% endif %}
+        {% if post.bertbench %}
+        <a href="{{ site.baseurl }}bert/cloudlab/{{ post.revision }}/{{ post.bertbench }}">Bert</a>
+        {% endif %}
+      </h2>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <h1 class="page-heading">Benchmarks Fiddle Server (2 socket)</h1>
 
   <ul class="post-list">
     {% for post in site.data.skylake2x %}
@@ -20,9 +44,9 @@ layout: default
         {% if post.gptbench %}
         <a href="{{ site.baseurl }}gpt2/skylake2x/{{ post.revision }}/{{ post.gptbench }}">GPT2</a>
         {% endif %}
-	{% if post.bertbench %}
-	<a href="{{ site.baseurl }}bert/skylake2x/{{ post.revision }}/{{ post.bertbench }}">Bert</a>
-	{% endif %}
+        {% if post.bertbench %}
+        <a href="{{ site.baseurl }}bert/skylake2x/{{ post.revision }}/{{ post.bertbench }}">Bert</a>
+        {% endif %}
       </h2>
     </li>
     {% endfor %}
