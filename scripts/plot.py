@@ -294,9 +294,9 @@ def plot_sequential_and_interleaved_ratio_per_batch(benchmarks, yaxis: str, labe
 
     ylabel = ""
     if yaxis == 'latency(avg)':
-        ylabel = "% Latency Loss"
+        ylabel = "% Latency degradation over Sequential"
     elif yaxis == 'throughput':
-        ylabel = "% Throughput Loss"
+        ylabel = "% Latency degradation over Sequential"
 
     topologies = benchmarks['topology'].unique()
     if len(topologies) != 2:
@@ -349,6 +349,79 @@ def plot_sequential_and_interleaved_ratio_per_batch(benchmarks, yaxis: str, labe
 
         plot.save("{}-{}-ratio-{}.png".format(bench, label.lower(), batch_size), dpi=300,
                   width=12, height=5, verbose=False)
+
+
+def plot_sequential_and_interleaved_heatmap(benchmarks, yaxis: str, label: str):
+    import math
+    "Plotting sequential and interleaved comparison per batch"
+
+    if yaxis not in ['latency(avg)', 'throughput']:
+        print("Invalid y-axis: {}".format(yaxis))
+        sys.exit(1)
+
+    title = ""
+    if yaxis == 'latency(avg)':
+        title = "% Latency degradation over Sequential"
+    elif yaxis == 'throughput':
+        title = "% Throughput degradation over Sequential"
+
+    topologies = benchmarks['topology'].unique()
+    if len(topologies) != 2:
+        print("Not enough topologies to compare")
+        return
+
+    data_set = []
+    for batch_size in benchmarks['batch_size'].unique():
+        for threads in benchmarks['intraop_threads'].unique():
+            for name in benchmarks.benchmark.unique():
+                opt = name.split('_')[2].upper()
+                if opt != "SCRIPT":
+                    continue
+                bench = name.split('_')[0]
+                benchmark = benchmarks.loc[(benchmarks['benchmark'] == name) &
+                                           (benchmarks['batch_size'] == batch_size) &
+                                           (benchmarks['intraop_threads'] == threads)]
+
+                topology_sequential = benchmark.loc[benchmark['topology']
+                                                    == 'sequential'][yaxis].iloc[0]
+                topology_interleaved = benchmark.loc[benchmark['topology']
+                                                     == 'interleave'][yaxis].iloc[0]
+                if yaxis == 'latency(avg)':
+                    loss = int(((topology_interleaved - topology_sequential) /
+                                topology_sequential) * 100)
+                elif yaxis == 'throughput':
+                    loss = int(((topology_sequential - topology_interleaved) /
+                                topology_sequential) * 100)
+                new_row = pd.DataFrame.from_records([{
+                    "batch_size": int(math.log2(batch_size)),
+                    "intraop_threads": int(threads),
+                    "sequential": topology_sequential,
+                    "interleave": topology_interleaved,
+                    "loss": loss
+                }])
+                data_set.append(new_row)
+
+    data = pd.concat(data_set)
+
+    plot = ggplot(data=data,
+                  mapping=aes(x='intraop_threads', y='batch_size', fill='loss')) + \
+        labs(x="# Threads") + \
+        labs(y="Batch Size (2 ^ y)") + \
+        theme(legend_position="right", legend_title=element_blank()) +\
+        scale_x_continuous(breaks=data['intraop_threads'].unique(), labels=lambda lst: ["{:,}".format(x) for x in lst]) + \
+        scale_y_continuous(breaks=data['batch_size'].unique(), labels=lambda lst: ["{:,}".format(x) for x in lst]) + \
+        geom_tile(aes(width=.95, height=.95)) + \
+        ggtitle("{}".format(title)) + \
+        geom_text(aes(label='loss'), size=7, color='black') + \
+        theme(axis_text_x=element_text(size=10),
+              axis_text_y=element_text(size=10),
+              panel_background=element_rect(fill="white"),
+              panel_grid_major=element_line(colour="white"),
+              strip_background=element_rect(colour="orange", fill="orange")) + \
+        scale_fill_gradientn(colors=[
+            "#0080FF", "#00FFFF", "#00FF80", "#FFFF00", "#FF8000", "#FF0000", "#800000"])
+    plot.save("{}-{}-numa-heatmap.png".format(bench, label.lower()), dpi=300,
+              width=12, height=5, verbose=False)
 
 
 def plot_multiinstance_comparison_per_batch(benchmarks, yaxis: str, label: str):
@@ -449,6 +522,8 @@ def plot_latency(df, ptype):
             df, 'latency(avg)', 'Latency')
         plot_sequential_and_interleaved_ratio_per_batch(
             df, 'latency(avg)', 'Latency')
+        plot_sequential_and_interleaved_heatmap(
+            df, 'latency(avg)', 'Latency')
     elif ptype == PType.batch or ptype == PType.all:
         scaling_plot_per_thread(df, 'latency(avg)', 'Latency')
     elif ptype == PType.multiinstance or ptype == PType.all:
@@ -469,6 +544,8 @@ def plot_throughput(df, ptype):
         plot_sequential_and_interleaved_comparison_per_batch(
             df, 'throughput', 'Throughput')
         plot_sequential_and_interleaved_ratio_per_batch(
+            df, 'throughput', 'Throughput')
+        plot_sequential_and_interleaved_heatmap(
             df, 'throughput', 'Throughput')
     elif ptype == PType.batch or ptype == PType.all:
         scaling_plot_per_thread(df, 'throughput', 'Throughput')
