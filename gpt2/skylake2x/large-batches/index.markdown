@@ -65,6 +65,16 @@ title:  "GPT-2"
 
 # NUMA-Effects
 
+## % Latency Degradation HeatMap
+<p float="left">
+<img src="./gpt2-latency-numa-heatmap.png" alt="GPT-2 Latency Degradation" width="100%"/>
+</p>
+
+## % Throughput Degradation HeatMap
+<p float="left">
+<img src="./gpt2-throughput-numa-heatmap.png" alt="GPT-2 Latency Degradation" width="100%"/>
+</p>
+
 ## Latency Per Batch
 <p float="left">
 <img src="./gpt2-latency-numa-1.png" alt="GPT-2 Latency BS=1" width="100%"/>

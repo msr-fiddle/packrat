@@ -60,6 +60,16 @@ title:  "ResNet50"
 
 # NUMA-Effects
 
+## % Latency Degradation HeatMap
+<p float="left">
+<img src="./resnet-latency-numa-heatmap.png" alt="ResNet Latency Degradation" width="100%"/>
+</p>
+
+## % Throughput Degradation HeatMap
+<p float="left">
+<img src="./resnet-throughput-numa-heatmap.png" alt="ResNet Latency Degradation" width="100%"/>
+</p>
+
 ## Latency Per Batch
 <p float="left">
 <img src="./resnet-latency-numa-1.png" alt="ResNet Latency BS=1" width="100%"/>

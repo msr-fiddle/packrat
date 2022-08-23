@@ -60,6 +60,16 @@ title:  "Inception"
 
 # NUMA-Effects
 
+## % Latency Degradation HeatMap
+<p float="left">
+<img src="./inception-latency-numa-heatmap.png" alt="Inception Latency Degradation" width="100%"/>
+</p>
+
+## % Throughput Degradation HeatMap
+<p float="left">
+<img src="./inception-throughput-numa-heatmap.png" alt="Inception Latency Degradation" width="100%"/>
+</p>
+
 ## Latency Per Batch
 <p float="left">
 <img src="./inception-latency-numa-1.png" alt="Inception Latency BS=1" width="100%"/>

@@ -60,6 +60,16 @@ title:  "Bert"
 
 # NUMA-Effects
 
+## % Latency Degradation HeatMap
+<p float="left">
+<img src="./bert-latency-numa-heatmap.png" alt="Bert Latency Degradation" width="100%"/>
+</p>
+
+## % Throughput Degradation HeatMap
+<p float="left">
+<img src="./bert-throughput-numa-heatmap.png" alt="Bert Latency Degradation" width="100%"/>
+</p>
+
 ## Latency Per Batch
 <p float="left">
 <img src="./bert-latency-numa-1.png" alt="Bert Latency BS=1" width="100%"/>
