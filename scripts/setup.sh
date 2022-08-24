@@ -47,9 +47,28 @@ install_deps() {
     python3 -m pip install python_papi
 }
 
+system_settings() {
+  # Disable all the NUMA-related Linux policies
+  $SUDO sh -c "echo 0 > /proc/sys/kernel/numa_balancing"
+  $SUDO sh -c "echo 0 > /sys/kernel/mm/ksm/run"
+  $SUDO sh -c "echo 0 > /sys/kernel/mm/ksm/merge_across_nodes"
+  $SUDO sh -c "echo never > /sys/kernel/mm/transparent_hugepage/enabled"
+
+  # Disable DVFS
+  echo performance > sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+  $SUDO sh -c "echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo"
+
+  # Disable Hyperthreading
+  $SUDO sh -c "echo off > /sys/devices/system/cpu/smt/control"
+
+  # Allow performance counters to be read
+  $SUDO sh -c "echo 1 > /proc/sys/kernel/perf_event_paranoid"
+}
+
 # Check the number of arguments
+USAGE="Usage: $0 [torch|vtune|deps|system]"
 if [ $# -ne 1 ]; then
-  echo "Usage: $0 <deps|torch>"
+  echo $USAGE
   exit 1
 fi
 
@@ -59,7 +78,9 @@ elif [ "$1" == "torch" ]; then
   install_torch
 elif [ "$1" == "vtune" ]; then
   install_vtune
+elif [ "$1" == "system" ]; then
+  system_settings
 else
-  echo "Usage: $0 <deps|torch|vtune>"
+  echo $USAGE
   exit 1
 fi
