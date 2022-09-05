@@ -74,12 +74,15 @@ class ResnetBench(implements(Bench)):
     def measure_flops(self, config, model, data):
         from pypapi import events, papi_high as high
 
-        high.start_counters([events.PAPI_DP_OPS, events.PAPI_SP_OPS])
+        try:
+            high.start_counters([events.PAPI_DP_OPS, events.PAPI_SP_OPS])
 
-        for _ in range(config.iterations):
-            self.run_inference(model, data)
+            for _ in range(config.iterations):
+                self.run_inference(model, data)
 
-        config.set_flops(sum(high.stop_counters()))
+            config.set_flops(sum(high.stop_counters()))
+        except:
+            print("Unable to use the performance counters!")
 
     def inference_manual(self, config: Config, model: torch.nn.Module, data: torch.Tensor):
         torch.set_num_threads(config.intraop_threads)

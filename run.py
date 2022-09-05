@@ -126,7 +126,7 @@ def run_multi_instances(args: Namespace):
     core_count = lower_power_of_two(int(psutil.cpu_count(logical=False) /
                                         len(topology.get_sockets())))
     corelist = topology.allocate_cores(
-        "socket", core_count, "sequential")
+        "socket", core_count, args.mapping)
 
     optimizer = Optimizer()
     for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
