@@ -1,27 +1,28 @@
-from multiprocessing import shared_memory
+import pickle
+import pyarrow
+from pyarrow import plasma
+from store import Cache
+from serde import extract_tensors, replace_tensors
 
 
-class Shmem:
-    def __init__(self, name, size):
-        self.name = name
-        self.size = size
-        try:
-            self.shm = shared_memory.SharedMemory(
-                name=name, create=True, size=size)
-        except FileExistsError:
-            self.shm = shared_memory.SharedMemory(
-                name=name)
+class PlasmaStore:
+    def __init__(self) -> None:
+        cache = Cache()
+        self.store = plasma.start_plasma_store(1024 * 1024 * 1024)
+        self.client = plasma.connect(self.store.__enter__()[0])
+        resnet = extract_tensors(cache.cache["resnet50"])
 
-    def __del__(self):
-        self.shm.close()
-        self.shm.unlink()
+        # TODO: Figure out how to serialize the model and tensors
+        serialized_model = pickle.dumps(resnet, pickle.HIGHEST_PROTOCOL)
+        self.resnetID = self.client.put(serialized_model)
+        print("resnetID", self.resnetID)
 
-    def read(self):
-        return self.shm.buf
+        # TODO: Figure out how to serialize the model and tensors
+        (model, weights) = pickle.loads(self.client.get(self.resnetID))
+        replace_tensors(model, weights)
+        model.eval()
 
-    def write(self, data):
-        self.shm.buf[:] = data
-
+        pyarrow.SerializationContext.register_type()
 
 if __name__ == "__main__":
-    print(Shmem("test", 1000).name, Shmem("test", 1000).name)
+    store = PlasmaStore()
