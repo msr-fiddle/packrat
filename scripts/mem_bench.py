@@ -174,6 +174,7 @@ def test_pickled_resnet50():
     import transformers
     from pyarrow import plasma
     from multiprocessing.shared_memory import SharedMemory
+    import pyarrow as pa
 
     store = plasma.start_plasma_store(1 * 1024 * 1024 * 1024)
     name = store.__enter__()[0]
@@ -188,17 +189,12 @@ def test_pickled_resnet50():
     serialized_model = pickle.dumps(extract_tensors(
         model), buffer_callback=lambda b: buffer.append(b.raw()), protocol=pickle.HIGHEST_PROTOCOL)
 
-    sz, ls = pack_frames(buffer)
-    shared_mem = SharedMemory(create=True, size=sz)
-
-    write_offset = 0
-    for data in ls:
-        write_end = write_offset + len(data)
-        shared_mem.buf[write_offset:write_end] = data  # type: ignore
-
-        write_offset = write_end
+    _sz, ls = pack_frames(buffer)
+    buf = pa.py_buffer(b"".join(ls))
+    buf_id = client.put(buf)
 
     serial = client.put(serialized_model)
+    del buf
     del buffer
     del serialized_model
 
@@ -210,22 +206,18 @@ def test_pickled_resnet50():
     objects = []
     for i in range(100):
         (model, weights) = pickle.loads(
-            client.get(serial), buffers=unpack_frames(shared_mem.buf[:sz]))
+            client.get(serial), buffers=unpack_frames(client.get(buf_id)))
         objects.append((model, weights))
         replace_tensors(model, weights)
         objects[i][0].eval()
 
     # Take readings after making 100 copies of the object
     memory_info_after = p.memory_info().rss
-    del objects
-    gc.collect()
 
     # Verify that the objects are the same
     # assert memory_info_before == memory_info_after
     print(f"Used Memory {memory_info_before / 1e6} MB")
     print(f"Used Memory {memory_info_after / 1e6} MB")
-    shared_mem.close()
-    shared_mem.unlink()
 
 
 if __name__ == "__main__":
