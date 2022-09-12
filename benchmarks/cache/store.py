@@ -7,7 +7,7 @@ import torch
 from torchvision import models
 import transformers
 
-from serde import extract_tensors, pack_frames, replace_tensors, unpack_frames
+from benchmarks.cache.serde import extract_tensors, pack_frames, replace_tensors, unpack_frames
 
 
 def get_model(name: str) -> torch.nn.Module:
