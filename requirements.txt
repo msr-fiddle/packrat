@@ -1,0 +1,9 @@
+psutil
+torch
+torchvision
+torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+transformers
+python-interface
+pandas
+plotnine
+pyarrow
