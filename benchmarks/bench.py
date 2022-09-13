@@ -7,7 +7,7 @@ import csv
 import logging
 
 from cache import store
-from config import Config, Optimizations, ModelSource
+from config import Benchmark, Config, Optimizations, ModelSource
 
 
 class Bench(Interface):
@@ -28,21 +28,23 @@ class Bench(Interface):
         from transformers import GPT2LMHeadModel, BertModel
 
         if config.optimization == Optimizations.script:
-            if config.benchmark == "gpt2":
+            if config.benchmark == Benchmark.gpt2:
                 model = GPT2LMHeadModel.from_pretrained(
                     'gpt2', torchscript=True)
                 model.eval()
                 return model
-            if config.benchmark == "bert":
+            if config.benchmark == Benchmark.bert:
                 model = BertModel.from_pretrained(
                     'bert-base-uncased', torchscript=True)
+                model.eval()
+                return model
 
         if config.source == ModelSource.torch:
-            return store.get_model_from_torch(config.benchmark)
+            return store.get_model_from_torch(config.benchmark.name)
 
         if config.source == ModelSource.cache:
             assert config.store is not None, "Store is not set"
-            return store.get_model_from_plasma(config.storename, config.benchmark)
+            return store.get_model_from_plasma(config.storename, config.benchmark.name)
 
         raise Exception("Invalid source")
 

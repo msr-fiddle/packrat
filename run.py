@@ -15,6 +15,7 @@ from utils.topology import CPUInfo
 from utils.optimizer import Optimizer
 
 from benchmarks.config import Benchmark, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
+from benchmarks.cache import store
 
 
 def parse_args():
@@ -46,7 +47,18 @@ def parse_args():
                       help=f"Pick a thread pinning scheme {[pin.name for pin in ThreadPinning]}")
     args.add_argument("--source", type=str, default=ModelSource.torch.name,
                       help=f"Pick a model source {[src.name for src in ModelSource]}")
+    args.add_argument("--storename", type=str, default=None,
+                      help="The name of the store (handled internally)")
     return args.parse_args()
+
+
+def static_checks(args: Namespace):
+    if args.source == ModelSource.cache.name:
+        if args.storename is None:
+            raise Exception("Cache store name must be provided")
+        if args.optimization == Optimizations.script.name:
+            raise Exception(
+                "Cache store does not support torchscript optimization yet!")
 
 
 def set_env(env, env_name: str, env_value: str):
@@ -68,11 +80,11 @@ def run_with_parameters(config: Config):
         proclist = config.core_list
         cmd = []
 
-        if config.pinnning.name == "numactl":
+        if config.pinnning == ThreadPinning.numactl:
             cmd = ["numactl"]
             cmd.append("-C {}".format(",".join(str(x)
                                                for x in proclist)))
-        elif config.pinnning.name == "omp":
+        elif config.pinnning == ThreadPinning.omp:
             # Static division of work among threads
             set_env(myenv, "OMP_SCHEDULE", "STATIC")
             # Schedule the thread near to the parent thread
@@ -178,6 +190,15 @@ def run_multi_instances(args: Namespace):
 
 if __name__ == '__main__':
     arguments = parse_args()
+
+    if arguments.source == ModelSource.cache.name:
+        cache = store.Cache()
+        arguments.storename = cache.storename
+
+    # static_checks should be called after setting the storename
+    static_checks(arguments)
+
+    print(arguments)
     if arguments.instance_id == 1:
         run(arguments)
     else:
