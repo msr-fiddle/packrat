@@ -1,14 +1,16 @@
-# NUMA-aware Frameworks
+[![Build and test packrat modules](https://github.com/msr-fiddle/naf/actions/workflows/python.yml/badge.svg)](https://github.com/msr-fiddle/naf/actions/workflows/python.yml)
 
+# Packrat
 ## Setup
 ```bash
 bash scripts/setup.sh deps
 bash scripts/setup.sh torch
+bash scripts/setup.sh system
 ```
 
 ## Run
 ```bash
-python run.py
+python run.py --help
 ```
 
 ## Build and Run docker image
