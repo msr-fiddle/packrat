@@ -12,6 +12,22 @@ from benchmarks.cache.store import Cache, get_model_from_plasma, get_model_from_
 from benchmarks.config import Benchmark
 
 
+def compare_models(model_1, model_2):
+    models_differ = 0
+    for key_item_1, key_item_2 in zip(model_1.state_dict().items(), model_2.state_dict().items()):
+        if torch.equal(key_item_1[1], key_item_2[1]):
+            pass
+        else:
+            models_differ += 1
+            if (key_item_1[0] == key_item_2[0]):
+                print('Mismtach found at', key_item_1[0])
+                return False
+            else:
+                raise Exception
+    if models_differ == 0:
+        return True
+
+
 class TestCache(unittest.TestCase):
     """
     Testcases for the cache
@@ -144,3 +160,23 @@ class TestCache(unittest.TestCase):
             self.assertEqual(len(storename), len(
                 "/tmp/test_plasma-xxxxxxxx/plasma.sock"))
             del store
+
+    def test_model_weights_equality(self) -> None:
+        torch_resnet = get_model_from_torch(Benchmark.resnet.name)
+        torch_resnet.eval()
+
+        cache = Cache()
+        resnet_cache = cache.get_model_from_cache(Benchmark.resnet.name)
+        resnet_cache.eval()
+        compare_models(torch_resnet, resnet_cache)
+
+    def test_model_weights_equality_across_inferences(self) -> None:
+        torch_resnet = get_model_from_torch(Benchmark.resnet.name)
+        torch_resnet.eval()
+
+        cache = Cache()
+        resnet_cache = cache.get_model_from_cache(Benchmark.resnet.name)
+        resnet_cache.eval()
+
+        resnet_cache(torch.randn(1, 3, 224, 224))
+        compare_models(torch_resnet, resnet_cache)
