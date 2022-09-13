@@ -10,7 +10,7 @@ import transformers
 from benchmarks.cache.serde import extract_tensors, pack_frames, replace_tensors, unpack_frames
 
 
-def get_model(name: str) -> torch.nn.Module:
+def get_model_from_torch(name: str) -> torch.nn.Module:
 
     if name == "resnet50":
         resnet50 = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
@@ -37,6 +37,19 @@ def get_model(name: str) -> torch.nn.Module:
     raise Exception(f"Unknown model: {name}")
 
 
+def get_model_from_plasma(storename: str, model_name: str) -> torch.nn.Module:
+    client = plasma.connect(storename)
+    metadata = pickle.loads(client.get(plasma.ObjectID(2 * b"metadata00")))
+    serial_ref = metadata[model_name]["serial"]
+    buf_ref = metadata[model_name]["buf_id"]
+    (model, weights) = pickle.loads(client.get(serial_ref),
+                                    buffers=unpack_frames(client.get(buf_ref)))
+    replace_tensors(model, weights)
+    model.eval()
+    client.disconnect()
+    return model
+
+
 class Cache:
     """
     Zero-copy model transfer from the cache to the client
@@ -53,43 +66,56 @@ class Cache:
         """
         self.store = plasma.start_plasma_store(1 * 1024 * 1024 * 1024)
         self.storename, _ignore = self.store.__enter__()
-        client = plasma.connect(self.storename)
+        self.client = plasma.connect(self.storename)
 
-        self.benchmark = "resnet50"
-        ouf_of_band_buffer = []
-        model = get_model(self.benchmark)
-        serialized_model = pickle.dumps(
-            extract_tensors(model),
-            buffer_callback=lambda b: ouf_of_band_buffer.append(b.raw()),
-            protocol=pickle.HIGHEST_PROTOCOL
-        )
+        self.metadata = {}
 
-        _sz, byte_ls = pack_frames(ouf_of_band_buffer)
-        buf = pa.py_buffer(b"".join(byte_ls))
+        benchmarks = ["resnet50"]
+        for self.benchmark in benchmarks:
+            ouf_of_band_buffer = []
+            model = get_model_from_torch(self.benchmark)
+            serialized_model = pickle.dumps(
+                extract_tensors(model),
+                buffer_callback=lambda b: ouf_of_band_buffer.append(b.raw()),
+                protocol=pickle.HIGHEST_PROTOCOL
+            )
 
-        self.buf_id = client.put(buf)
-        self.serial = client.put(serialized_model)
-        client.disconnect()
+            _sz, byte_ls = pack_frames(ouf_of_band_buffer)
+            buf = pa.py_buffer(b"".join(byte_ls))
 
-        # TODO: Figure out what to do with the buffers (fixme)
-        del ouf_of_band_buffer
-        del model
-        del serialized_model
-        del buf
-        del byte_ls
+            buf_id = self.client.put(buf)
+            serial = self.client.put(serialized_model)
+
+            self.metadata[self.benchmark] = {
+                "buf_id": buf_id,
+                "serial": serial
+            }
+
+            # TODO: Figure out what to do with the buffers (fixme)
+            del ouf_of_band_buffer
+            del model
+            del serialized_model
+            del buf
+            del byte_ls
+
+        self.client.put(pickle.dumps(self.metadata),
+                        object_id=plasma.ObjectID(2 * b"metadata00"))
 
     def __str__(self):
         return self.__class__.__name__
 
-    def get_model(self) -> torch.nn.Module:
-        client = plasma.connect(self.storename)
-        (model, weights) = pickle.loads(client.get(self.serial),
-                                        buffers=unpack_frames(client.get(self.buf_id)))
+    def get_model_from_cache(self, benchmark: str) -> torch.nn.Module:
+        metadata = pickle.loads(self.client.get(
+            plasma.ObjectID(2 * b"metadata00")))
+        serial_ref = metadata[benchmark]["serial"]
+        buf_ref = metadata[benchmark]["buf_id"]
+        (model, weights) = pickle.loads(self.client.get(serial_ref),
+                                        buffers=unpack_frames(self.client.get(buf_ref)))
         replace_tensors(model, weights)
         return model
 
 
 if __name__ == '__main__':
     cache = Cache()
-    resnet = cache.get_model()
+    resnet = cache.get_model_from_cache("resnet50")
     resnet.eval()
