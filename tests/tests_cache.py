@@ -9,6 +9,7 @@ import torchvision
 from psutil import Process
 from pyarrow import plasma
 from benchmarks.cache.store import Cache, get_model_from_plasma, get_model_from_torch
+from benchmarks.config import Benchmark
 
 
 class TestCache(unittest.TestCase):
@@ -46,8 +47,8 @@ class TestCache(unittest.TestCase):
 
         _objects = []
         for _i in range(100):
-            buffer = client.get(metadata["resnet50"]["buf_id"])
-            serialized = client.get(metadata["resnet50"]["serial"])
+            buffer = client.get(metadata[Benchmark.resnet.name]["buf_id"])
+            serialized = client.get(metadata[Benchmark.resnet.name]["serial"])
             _objects.append((buffer, serialized))
 
         memory_info_after = process.memory_info().rss
@@ -68,7 +69,8 @@ class TestCache(unittest.TestCase):
 
         _objects = []
         for _i in range(model_count):
-            model = get_model_from_plasma(cache.storename, "resnet50")
+            model = get_model_from_plasma(
+                cache.storename, Benchmark.resnet.name)
             self.assertIsInstance(model, torchvision.models.resnet.ResNet)
             _objects.append(model)
 
@@ -90,7 +92,7 @@ class TestCache(unittest.TestCase):
 
         _objects = []
         for _i in range(model_count):
-            model = cache.get_model_from_cache("resnet50")
+            model = cache.get_model_from_cache(Benchmark.resnet.name)
             self.assertIsInstance(model, torchvision.models.resnet.ResNet)
             _objects.append(model)
 
@@ -100,7 +102,7 @@ class TestCache(unittest.TestCase):
 
     def test_model_isinstance_resnet(self) -> None:
         cache = Cache()
-        resnet = cache.get_model_from_cache("resnet50")
+        resnet = cache.get_model_from_cache(Benchmark.resnet.name)
         resnet.eval()
 
         self.assertIsInstance(resnet, torch.nn.Module)
@@ -109,22 +111,22 @@ class TestCache(unittest.TestCase):
             resnet, torchvision.models.inception.Inception3)
 
     def test_get_model(self) -> None:
-        benchmarks = ["resnet50", "inception", "bert", "gpt2"]
+        benchmarks = [bench.name for bench in Benchmark]
         for benchmark in benchmarks:
             model = get_model_from_torch(benchmark)
             self.assertIsNotNone(model)
             self.assertIsInstance(model, torch.nn.Module)
 
             # Check if the model is an instance of the correct model
-            if benchmark == "resnet50":
+            if benchmark == Benchmark.resnet.name:
                 self.assertIsInstance(model, torchvision.models.resnet.ResNet)
-            if benchmark == "inception":
+            if benchmark == Benchmark.inception.name:
                 self.assertIsInstance(
                     model, torchvision.models.inception.Inception3)
-            if benchmark == "bert":
+            if benchmark == Benchmark.bert.name:
                 self.assertIsInstance(
                     model, transformers.models.bert.modeling_bert.BertModel)
-            if benchmark == "gpt2":
+            if benchmark == Benchmark.gpt2.name:
                 self.assertIsInstance(
                     model, transformers.models.gpt2.modeling_gpt2.GPT2LMHeadModel)
 
