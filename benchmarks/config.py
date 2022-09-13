@@ -48,13 +48,22 @@ class Optimizations(Enum):
     ipex = 5
 
 
+class ModelSource(Enum):
+    """
+    Enum for the model source
+    """
+    torch = 1
+    cache = 2
+    none = 3
+
+
 class Config:
     """
     Common configurations
     """
 
     def __init__(self, args: None):
-        if args is not(None):
+        if args is not (None):
             self.benchmark = Benchmark[args.benchmark]
             self.run_type = RunType[args.run_type]
             self.optimization = Optimizations[args.optimization]

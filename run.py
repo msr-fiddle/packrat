@@ -9,24 +9,25 @@ of thread migration.
 import logging
 import os
 import subprocess
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 import psutil
 from utils.topology import CPUInfo
 from utils.optimizer import Optimizer
 
-from benchmarks.config import Benchmark, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
+from benchmarks.config import Benchmark, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
 
 
 def parse_args():
-    args = ArgumentParser(description="Run the benchmark")
+    args = ArgumentParser(description="Run the benchmark",
+                          formatter_class=ArgumentDefaultsHelpFormatter)
     args.add_argument("--benchmark", type=str, default=Benchmark.resnet.name,
-                      help="The benchmark to run")
+                      help=f"Pick a benchmark to run {[bench.name for bench in Benchmark]}")
     args.add_argument("--run-type", type=str, default=RunType.manual.name,
-                      help="The run type")
+                      help=f"Pick a run type {[run.name for run in RunType]}")
     args.add_argument("--optimization", type=str, default=Optimizations.script.name,
-                      help="The optimization to use")
+                      help=f"Pick an optimization to use {[opt.name for opt in Optimizations]}")
     args.add_argument("--mapping", type=str, default=ThreadMapping.sequential.name,
-                      help="The thread mapping")
+                      help=f"Pick a thread mapping {[map.name for map in ThreadMapping]}")
     args.add_argument("--batch-size", type=int, default=1,
                       help="The batch size")
     args.add_argument("--iterations", type=int, default=100,
@@ -42,7 +43,9 @@ def parse_args():
     args.add_argument("--instance_id", type=int, default=1,
                       help="The number of instances")
     args.add_argument("--pinning", type=str, default=ThreadPinning.numactl.name,
-                      help="The thread pinning scheme")
+                      help=f"Pick a thread pinning scheme {[pin.name for pin in ThreadPinning]}")
+    args.add_argument("--source", type=str, default=ModelSource.torch.name,
+                      help=f"Pick a model source {[src.name for src in ModelSource]}")
     return args.parse_args()
 
 

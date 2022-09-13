@@ -26,15 +26,6 @@ class BertBench(implements(Bench)):
         elif config.run_type == RunType.manual:
             self.inference_manual(config, model, data, segments)
 
-    def get_model(self, config: Config) -> torch.nn.Module:
-        if config.optimization == "script":
-            model = BertModel.from_pretrained(
-                'bert-base-uncased', torchscript=True)
-        else:
-            model = BertModel.from_pretrained('bert-base-uncased')
-        model.eval()
-        return model
-
     def warmup(self, model, data, segments):
         with torch.no_grad():
             timeit.Timer(lambda: self.run_inference_custom(
