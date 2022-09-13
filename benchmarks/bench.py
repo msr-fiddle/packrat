@@ -43,7 +43,7 @@ class Bench(Interface):
             return store.get_model_from_torch(config.benchmark.name)
 
         if config.source == ModelSource.cache:
-            assert config.store is not None, "Store is not set"
+            assert config.storename is not None, "Store is not set"
             return store.get_model_from_plasma(config.storename, config.benchmark.name)
 
         raise Exception("Invalid source")

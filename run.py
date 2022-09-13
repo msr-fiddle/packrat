@@ -198,7 +198,6 @@ if __name__ == '__main__':
     # static_checks should be called after setting the storename
     static_checks(arguments)
 
-    print(arguments)
     if arguments.instance_id == 1:
         run(arguments)
     else:

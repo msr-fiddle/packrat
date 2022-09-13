@@ -12,7 +12,7 @@ from .serde import extract_tensors, pack_frames, replace_tensors, unpack_frames
 
 def get_model_from_torch(name: str) -> torch.nn.Module:
 
-    if name == "resnet50":
+    if name == "resnet":
         resnet50 = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
         resnet50.eval()
         return resnet50
@@ -70,7 +70,7 @@ class Cache:
 
         self.metadata = {}
 
-        benchmarks = ["resnet50"]
+        benchmarks = ["resnet"]
         for self.benchmark in benchmarks:
             ouf_of_band_buffer = []
             model = get_model_from_torch(self.benchmark)
