@@ -126,7 +126,7 @@ class TestCache(unittest.TestCase):
                     model, transformers.models.bert.modeling_bert.BertModel)
             if benchmark == "gpt2":
                 self.assertIsInstance(
-                    model, transformers.models.gpt2.modeling_gpt2.GPT2Model)
+                    model, transformers.models.gpt2.modeling_gpt2.GPT2LMHeadModel)
 
     def test_plasma_storename_length(self) -> None:
         """

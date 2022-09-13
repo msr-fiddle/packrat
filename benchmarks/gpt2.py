@@ -25,14 +25,6 @@ class GptBench(implements(Bench)):
         elif config.run_type == RunType.manual:
             self.inference_manual(config, model, data)
 
-    def get_model(self, config: Config) -> torch.nn.Module:
-        if config.optimization == "script":
-            model = GPT2LMHeadModel.from_pretrained('gpt2', torchscript=True)
-        else:
-            model = GPT2LMHeadModel.from_pretrained('gpt2')
-        model.eval()
-        return model
-
     def warmup(self, model, data):
         with torch.no_grad():
             timeit.Timer(lambda: self.run_inference(

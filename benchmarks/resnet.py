@@ -34,11 +34,6 @@ class ResnetBench(implements(Bench)):
         if config.intraop_threads == 1 and config.interop_threads == 1:
             self.measure_flops(config, model, data)
 
-    def get_model(self, config: Config) -> torch.nn.Module:
-        model = models.resnet50(pretrained=True)
-        model.eval()
-        return model
-
     def warmup(self, model, data):
         with torch.no_grad():
             timeit.Timer(lambda: self.run_inference(

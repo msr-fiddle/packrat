@@ -7,7 +7,7 @@ import torch
 from torchvision import models
 import transformers
 
-from benchmarks.cache.serde import extract_tensors, pack_frames, replace_tensors, unpack_frames
+from .serde import extract_tensors, pack_frames, replace_tensors, unpack_frames
 
 
 def get_model_from_torch(name: str) -> torch.nn.Module:
@@ -30,7 +30,7 @@ def get_model_from_torch(name: str) -> torch.nn.Module:
         return bert
 
     if name == "gpt2":
-        gpt2 = transformers.GPT2Model.from_pretrained('gpt2')
+        gpt2 = transformers.GPT2LMHeadModel.from_pretrained('gpt2')
         gpt2.eval()
         return gpt2
 

@@ -6,7 +6,8 @@ import os
 import csv
 import logging
 
-from config import Config, Optimizations
+from cache import store
+from config import Config, Optimizations, ModelSource
 
 
 class Bench(Interface):
@@ -18,8 +19,32 @@ class Bench(Interface):
     def run_inference(self, model: torch.nn.Module, data: torch.Tensor):
         pass
 
+    @interface.default
     def get_model(self, config: Config) -> torch.nn.Module:
-        pass
+        """
+        Cache store can return the model from the torch hub or from the cache.
+        However, torch hub does not support torchscript for default language-based models.
+        """
+        from transformers import GPT2LMHeadModel, BertModel
+
+        if config.optimization == Optimizations.script:
+            if config.benchmark == "gpt2":
+                model = GPT2LMHeadModel.from_pretrained(
+                    'gpt2', torchscript=True)
+                model.eval()
+                return model
+            if config.benchmark == "bert":
+                model = BertModel.from_pretrained(
+                    'bert-base-uncased', torchscript=True)
+
+        if config.source == ModelSource.torch:
+            return store.get_model_from_torch(config.benchmark)
+
+        if config.source == ModelSource.cache:
+            assert config.store is not None, "Store is not set"
+            return store.get_model_from_plasma(config.storename, config.benchmark)
+
+        raise Exception("Invalid source")
 
     def get_test_data(self, batch_size: int) -> torch.Tensor:
         pass
