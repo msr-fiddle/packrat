@@ -6,11 +6,13 @@ of thread migration.
 """
 #!/usr/bin/python3
 
+import multiprocessing
 import logging
 import os
 import subprocess
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 import psutil
+from benchmarks.resnet import ResnetBench
 from utils.topology import CPUInfo
 from utils.optimizer import Optimizer
 
@@ -130,8 +132,32 @@ def run(args: Namespace):
                 run_with_parameters(config)
 
 
-def run_multi_instances(args: Namespace):
+def start_bench(config):
+    os.sched_setaffinity(0, config.core_list)
+    config.benchmark = Benchmark.resnet
+    bench = ResnetBench()
+    bench.latencies = [None] * config.iterations
+    bench.run(config)
+    bench.report(config)
+
+
+if __name__ == '__main__':
+    multiprocessing.set_start_method('spawn', force=True)
+    args = parse_args()
+
+    if args.source == ModelSource.cache.name:
+        cache = store.Cache()
+        args.storename = cache.storename
+
+    # static_checks should be called after setting the storename
+    static_checks(args)
+
     assert args.instance_id != 1, "Instance id must be greater than 1"
+    set_env(os.environ, "KMP_BLOCKTIME", "1")
+    set_env(os.environ, "OMP_SCHEDULE", "STATIC")
+    set_env(os.environ, "OMP_PROC_BIND", "CLOSE")
+    set_env(os.environ, "KMP_AFFINITY",
+            f"granularity=fine,explicit")
 
     def lower_power_of_two(x):
         import math
@@ -143,20 +169,8 @@ def run_multi_instances(args: Namespace):
     corelist = topology.allocate_cores(
         "socket", core_count, args.mapping)
 
-    optimizer = Optimizer()
-    for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
-        single_instance_config = Config(args)
-        single_instance_config.set_instance_id(1)
-        single_instance_config.set_mapping(single_instance_config.mapping)
-        single_instance_config.set_core_list(corelist)
-        single_instance_config.set_interop_threads(1)
-        single_instance_config.set_intraop_threads(core_count)
-        single_instance_config.set_batch_size(batch_size)
-        run_with_parameters(single_instance_config)
-
-        optimal_instances = []
-        optimizer.solution(core_count, batch_size,
-                           args.benchmark, optimal_instances)
+    for i in [16]:
+        optimal_instances = [(1, 16) for ins in range(i)]
 
         total_instances = len(optimal_instances)
         instances, cmd, config = [], [], []
@@ -173,32 +187,10 @@ def run_multi_instances(args: Namespace):
                 corelist[starting_core:starting_core + cores_per_instance])
             starting_core += cores_per_instance
 
-            cmd.append([
-                "numactl", "-C {}".format(",".join(str(x)
-                                                   for x in config[i].core_list)),
-                "python3"
-            ])
-            cmd[i].append(f"./benchmarks/{config[i].benchmark.name}.py")
-            cmd[i].append(repr(config[i]))
-
-            instances.append(subprocess.Popen(
-                cmd[i], env=os.environ.copy(), stdout=subprocess.DEVNULL))
+            instances.append(multiprocessing.Process(
+                target=start_bench, args=(config[i],)))
 
         for instance in instances:
-            instance.wait()
-
-
-if __name__ == '__main__':
-    arguments = parse_args()
-
-    if arguments.source == ModelSource.cache.name:
-        cache = store.Cache()
-        arguments.storename = cache.storename
-
-    # static_checks should be called after setting the storename
-    static_checks(arguments)
-
-    if arguments.instance_id == 1:
-        run(arguments)
-    else:
-        run_multi_instances(arguments)
+            instance.start()
+        for instance in instances:
+            instance.join()

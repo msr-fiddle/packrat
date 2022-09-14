@@ -13,17 +13,16 @@ import torchvision.models as models
 from torchvision import transforms
 from interface import implements
 
-from bench import Bench
-from config import Benchmark, Config, RunType
+from .bench import Bench
+from .config import Benchmark, Config, RunType
 
 
 class ResnetBench(implements(Bench)):
     def run(self, config: Config) -> None:
         model = self.get_model(config)
-        data = self.get_test_data(config.batch_size)
-
-        model, data = self.optimize_memory_layout(
-            config.optimization, model, data)
+        print("Model loaded")
+        data = self.get_test_data(config)
+        print("Running inference for {} iterations".format(config.iterations))
 
         if config.run_type == RunType.default:
             self.inference_benchmark(config, model, data)
@@ -39,13 +38,8 @@ class ResnetBench(implements(Bench)):
             timeit.Timer(lambda: self.run_inference(
                 model, data)).timeit(number=10)
 
-    def get_test_data(self, batch_size: int) -> torch.Tensor:
-        url, filename = (
-            "https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog-{}.jpg".format(config.instance_id))
-        try:
-            urllib.request.urlretrieve(url, filename)
-        except urllib.error.HTTPError:
-            urllib.request.urlretrieve(url, filename)
+    def get_test_data(self, config: Config) -> torch.Tensor:
+        filename = "dog-{}.jpg".format(config.instance_id)
         input_image = Image.open(filename)
 
         preprocess = transforms.Compose([
@@ -57,7 +51,7 @@ class ResnetBench(implements(Bench)):
         ])
         input_tensor = preprocess(input_image)
         input_batch = []
-        for i in range(0, batch_size, 1):
+        for i in range(0, config.batch_size, 1):
             input_batch.append(input_tensor)
 
         data = torch.stack(input_batch)
