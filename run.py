@@ -68,6 +68,19 @@ def set_env(env, env_name: str, env_value: str):
     env[env_name] = env_value
 
 
+def update_config(config: Config, instance_id: int, thread_mapping: ThreadMapping, batch_size: int, intraop_num: int, core_list: list) -> Config:
+    """
+    Update the configuration based on the arguments
+    """
+    config.set_instance_id(instance_id)
+    config.set_mapping(thread_mapping)
+    config.set_batch_size(batch_size)
+    config.set_interop_threads(1)
+    config.set_intraop_threads(intraop_num)
+    config.set_core_list(core_list)
+    return config
+
+
 def run_with_parameters(config: Config):
     """
     Run the benchmark with the given parameters
@@ -114,20 +127,16 @@ def run(args: Namespace):
     core_count = int(psutil.cpu_count(logical=False) /
                      len(topology.get_sockets()))
     for batch_size in [1, 8, 16, 32]:
-        for interop in [1]:
-            for intraop in range(1, core_count + 1):
-                proclist = topology.allocate_cores(
-                    "socket", intraop, config.mapping.name)
+        for intraop in range(1, core_count + 1):
+            proclist = topology.allocate_cores(
+                "socket", intraop, config.mapping.name)
 
-                # Set the configuration
-                config.set_mapping(config.mapping)
-                config.set_core_list(proclist)
-                config.set_interop_threads(interop)
-                config.set_intraop_threads(intraop)
-                config.set_batch_size(batch_size)
+            # Update the configuration
+            config = update_config(config, args.instance_id, ThreadMapping[args.mapping],
+                                   batch_size, intraop, proclist)
 
-                # Run the benchmark
-                run_with_parameters(config)
+            # Run the benchmark
+            run_with_parameters(config)
 
 
 def run_multi_instances(args: Namespace):
@@ -146,12 +155,8 @@ def run_multi_instances(args: Namespace):
     optimizer = Optimizer()
     for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
         single_instance_config = Config(args)
-        single_instance_config.set_instance_id(1)
-        single_instance_config.set_mapping(single_instance_config.mapping)
-        single_instance_config.set_core_list(corelist)
-        single_instance_config.set_interop_threads(1)
-        single_instance_config.set_intraop_threads(core_count)
-        single_instance_config.set_batch_size(batch_size)
+        single_instance_config = update_config(single_instance_config, 1, ThreadMapping[args.mapping],
+                                               batch_size, core_count, corelist)
         run_with_parameters(single_instance_config)
 
         optimal_instances = []
@@ -165,12 +170,10 @@ def run_multi_instances(args: Namespace):
             cores_per_instance = optimal_instances[i][0]
             batch_per_instance = optimal_instances[i][1]
 
-            config.append(Config(args))
-            config[i].set_instance_id(i + 1)
-            config[i].set_batch_size(batch_per_instance)
-            config[i].set_intraop_threads(cores_per_instance)
-            config[i].set_core_list(
-                corelist[starting_core:starting_core + cores_per_instance])
+            instance_config = Config(args)
+            instance_config = update_config(instance_config, i + 1, ThreadMapping[args.mapping], batch_per_instance,
+                                            cores_per_instance, corelist[starting_core:starting_core + cores_per_instance])
+            config.append(instance_config)
             starting_core += cores_per_instance
 
             cmd.append([
