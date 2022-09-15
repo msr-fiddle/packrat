@@ -6,14 +6,17 @@ of thread migration.
 """
 #!/usr/bin/python3
 
+import csv
 import multiprocessing
 import logging
 import os
 import subprocess
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
+import sys
+import time
 import psutil
 from benchmarks.resnet import ResnetBench
-from utils.topology import CPUInfo
+from utils.topology import CPUInfo, read_cpu_freq
 from utils.optimizer import Optimizer
 
 from benchmarks.config import Benchmark, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
@@ -33,7 +36,7 @@ def parse_args():
                       help=f"Pick a thread mapping {[map.name for map in ThreadMapping]}")
     args.add_argument("--batch-size", type=int, default=1,
                       help="The batch size")
-    args.add_argument("--iterations", type=int, default=100,
+    args.add_argument("--iterations", type=int, default=10,
                       help="The number of iterations")
     args.add_argument("--interop-threads", type=int, default=1,
                       help="The number of interop threads")
@@ -115,9 +118,9 @@ def run(args: Namespace):
     topology = CPUInfo()
     core_count = int(psutil.cpu_count(logical=False) /
                      len(topology.get_sockets()))
-    for batch_size in [1, 8, 16, 32]:
+    for batch_size in [16, 32]:
         for interop in [1]:
-            for intraop in range(1, core_count + 1):
+            for intraop in [core_count]:
                 proclist = topology.allocate_cores(
                     "socket", intraop, config.mapping.name)
 
@@ -132,19 +135,46 @@ def run(args: Namespace):
                 run_with_parameters(config)
 
 
-def start_bench(config):
+def start_bench(config, barrier):
     os.sched_setaffinity(0, config.core_list)
     config.benchmark = Benchmark.resnet
     bench = ResnetBench()
     bench.latencies = [None] * config.iterations
-    bench.run(config)
+    bench.run(config, barrier)
     bench.report(config)
 
 
+def freq_measurement(processes, barrier):
+    os.sched_setaffinity(0, {1})
+    file = open(f"freqs_{processes}.csv", "a+")
+    writer = csv.writer(file, delimiter=",")
+    writer.writerow(["Instances", "Iterations", "Freq"])
+
+    core_list = [2*p for p in range(processes)]
+    barrier.wait()
+    print("Starting freq measurement")
+    count = 0
+    while True:
+        core_freqs = []
+        for core in core_list:
+            core_freqs.append(read_cpu_freq(core))
+        writer.writerow([processes, count, sum(core_freqs)/len(core_freqs)])
+        file.flush()
+        count += 1
+        time.sleep(1)
+
+
 if __name__ == '__main__':
+    arguments = parse_args()
+    if arguments.instance_id == 1:
+        run(arguments)
+        sys.exit(0)
+
+    os.sched_setaffinity(0, [0])
     multiprocessing.set_start_method('spawn', force=True)
     args = parse_args()
 
+    cache = None
     if args.source == ModelSource.cache.name:
         cache = store.Cache()
         args.storename = cache.storename
@@ -153,6 +183,8 @@ if __name__ == '__main__':
     static_checks(args)
 
     assert args.instance_id != 1, "Instance id must be greater than 1"
+    set_env(os.environ, "OMP_NUM_THREADS", "16")
+    set_env(os.environ, "MKL_NUM_THREADS", "16")
     set_env(os.environ, "KMP_BLOCKTIME", "1")
     set_env(os.environ, "OMP_SCHEDULE", "STATIC")
     set_env(os.environ, "OMP_PROC_BIND", "CLOSE")
@@ -169,8 +201,12 @@ if __name__ == '__main__':
     corelist = topology.allocate_cores(
         "socket", core_count, args.mapping)
 
-    for i in [16]:
-        optimal_instances = [(1, 16) for ins in range(i)]
+    for processes in [1]:
+        barrier = multiprocessing.Barrier(processes + 1)
+        optimal_instances = [(16, 16) for ins in range(processes)]
+        process = multiprocessing.Process(
+            target=freq_measurement, args=(processes, barrier))
+        process.start()
 
         total_instances = len(optimal_instances)
         instances, cmd, config = [], [], []
@@ -188,9 +224,12 @@ if __name__ == '__main__':
             starting_core += cores_per_instance
 
             instances.append(multiprocessing.Process(
-                target=start_bench, args=(config[i],)))
+                target=start_bench, args=(config[i], barrier)))
 
         for instance in instances:
             instance.start()
         for instance in instances:
             instance.join()
+        writer = csv.writer(open("resnet_latency.csv", "a+"), delimiter=",")
+        writer.writerow(['\n'])
+        process.terminate()

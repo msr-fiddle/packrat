@@ -13,7 +13,7 @@ from .config import Benchmark, Config, Optimizations, ModelSource
 class Bench(Interface):
     Interface.latencies = []
 
-    def run(self, config: Config) -> None:
+    def run(self, config: Config, barrier) -> None:
         pass
 
     def run_inference(self, model: torch.nn.Module, data: torch.Tensor):

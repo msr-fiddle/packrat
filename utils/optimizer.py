@@ -134,6 +134,8 @@ class Optimizer:
 
 if __name__ == "__main__":
     optimizer = Optimizer()
-    instances = []
-    optimizer.solution(18, 1024, "resnet", instances)
-    print(instances)
+    for i in range(11):
+        batch_size = 2**i
+        instances = []
+        optimizer.solution(16, batch_size, "resnet", instances)
+        print(batch_size, instances)

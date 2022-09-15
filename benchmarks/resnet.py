@@ -18,10 +18,13 @@ from .config import Benchmark, Config, RunType
 
 
 class ResnetBench(implements(Bench)):
-    def run(self, config: Config) -> None:
+    def run(self, config: Config, barrier) -> None:
         model = self.get_model(config)
-        print("Model loaded")
         data = self.get_test_data(config)
+        model, data = self.optimize_memory_layout(
+            config.optimization, model, data)
+
+        barrier.wait()
         print("Running inference for {} iterations".format(config.iterations))
 
         if config.run_type == RunType.default:
@@ -39,7 +42,12 @@ class ResnetBench(implements(Bench)):
                 model, data)).timeit(number=10)
 
     def get_test_data(self, config: Config) -> torch.Tensor:
-        filename = "dog-{}.jpg".format(config.instance_id)
+        url, filename = (
+            "https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog-{}.jpg".format(config.instance_id))
+        try:
+            urllib.request.urlretrieve(url, filename)
+        except urllib.error.HTTPError:
+            urllib.request.urlretrieve(url, filename)
         input_image = Image.open(filename)
 
         preprocess = transforms.Compose([
@@ -61,17 +69,7 @@ class ResnetBench(implements(Bench)):
         return model(data)
 
     def measure_flops(self, config, model, data):
-        from pypapi import events, papi_high as high
-
-        try:
-            high.start_counters([events.PAPI_DP_OPS, events.PAPI_SP_OPS])
-
-            for _ in range(config.iterations):
-                self.run_inference(model, data)
-
-            config.set_flops(sum(high.stop_counters()))
-        except:
-            print("Unable to use the performance counters!")
+        pass
 
     def inference_manual(self, config: Config, model: torch.nn.Module, data: torch.Tensor):
         torch.set_num_threads(config.intraop_threads)
@@ -80,8 +78,19 @@ class ResnetBench(implements(Bench)):
         assert torch.get_num_threads, config.intraop_threads
         assert torch.get_num_interop_threads, config.interop_threads
 
-        # print(torch.__config__.parallel_info())
+        print(torch.__config__.parallel_info())
         self.warmup(model, data)
+
+        """with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU],
+            profile_memory=True,
+            record_shapes=True,
+            with_flops=True,
+            with_modules=True,
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(
+                "./log/resnet50"),
+            with_stack=True
+        ) as prof:"""
 
         for index in range(config.iterations):
             self.latencies[index] = timeit.Timer(

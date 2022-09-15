@@ -10,7 +10,7 @@ def test():
         tensor1 = torch.randn(n, n, dtype=torch.float64)
         tensor2 = torch.randn(n, n, dtype=torch.float64)
         start_time = timer()
-        high.start_counters([events.PAPI_DP_OPS, events.PAPI_SP_OPS])
+        high.start_counters([events.PAPI_DP_OPS])
         x = high.read_counters()
         assert x, [0, 0]
 
