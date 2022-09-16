@@ -7,10 +7,12 @@ of thread migration.
 #!/usr/bin/python3
 
 import logging
+import multiprocessing
 import os
 import subprocess
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 import psutil
+from benchmarks.resnet import ResnetBench
 from utils.topology import CPUInfo
 from utils.optimizer import Optimizer
 
@@ -61,19 +63,29 @@ def static_checks(args: Namespace):
                 "Cache store does not support torchscript optimization yet!")
 
 
-def set_env(env, env_name: str, env_value: str):
+def set_env(env, pinning: ThreadPinning):
     """
     Set the environment variable
     """
-    env[env_name] = env_value
+    env["KMP_BLOCKTIME"] = "1"
+
+    if pinning == ThreadPinning.omp:
+        env["OMP_SCHEDULE"] = "STATIC"
+        env["OMP_PROC_BIND"] = "CLOSE"
+        env["KMP_AFFINITY"] = "granularity=fine"
+    else:
+        env["OMP_SCHEDULE"] = ""
+        env["OMP_PROC_BIND"] = ""
+        env["KMP_AFFINITY"] = ""
+    return env
 
 
-def update_config(config: Config, instance_id: int, thread_mapping: ThreadMapping, batch_size: int, intraop_num: int, core_list: list) -> Config:
+def update_config(config: Config, instance_id: int, thread_mapping: str, batch_size: int, intraop_num: int, core_list: list) -> Config:
     """
     Update the configuration based on the arguments
     """
     config.set_instance_id(instance_id)
-    config.set_mapping(thread_mapping)
+    config.set_mapping(ThreadMapping[thread_mapping])
     config.set_batch_size(batch_size)
     config.set_interop_threads(1)
     config.set_intraop_threads(intraop_num)
@@ -81,62 +93,19 @@ def update_config(config: Config, instance_id: int, thread_mapping: ThreadMappin
     return config
 
 
-def run_with_parameters(config: Config):
+def run_single_instance(config: Config):
     """
     Run the benchmark with the given parameters
     """
-    myenv = os.environ.copy()
-    set_env(myenv, "KMP_BLOCKTIME", "1")
 
-    cmd = []
-    if config.run_type == RunType.manual:
-        proclist = config.core_list
-        cmd = []
+    if config.run_type == RunType.manual and config.pinnning == ThreadPinning.numactl:
+        os.sched_setaffinity(0, config.core_list)
 
-        if config.pinnning == ThreadPinning.numactl:
-            cmd = ["numactl"]
-            cmd.append("-C {}".format(",".join(str(x)
-                                               for x in proclist)))
-        elif config.pinnning == ThreadPinning.omp:
-            # Static division of work among threads
-            set_env(myenv, "OMP_SCHEDULE", "STATIC")
-            # Schedule the thread near to the parent thread
-            set_env(myenv, "OMP_PROC_BIND", "CLOSE")
-            set_env(myenv, "KMP_AFFINITY",
-                    f"granularity=fine,proclist={proclist},explicit")
-        else:
-            cmd = []
-
-    cmd.append("python3")
-    cmd.append(f"./benchmarks/{config.benchmark.name}.py")
-    cmd.append(repr(config))
-    logging.info("Running: %s", " ".join(cmd))
-    ret = subprocess.check_output(cmd, env=myenv)
-    if config.intraop_threads == 1:
-        flops = int(ret.decode("utf-8").split("\n")[-2])
-        config.set_flops(flops)
-
-
-def run(args: Namespace):
-    """
-    Main function
-    """
-    config = Config(args)
-
-    topology = CPUInfo()
-    core_count = int(psutil.cpu_count(logical=False) /
-                     len(topology.get_sockets()))
-    for batch_size in [1, 8, 16, 32]:
-        for intraop in range(1, core_count + 1):
-            proclist = topology.allocate_cores(
-                "socket", intraop, config.mapping.name)
-
-            # Update the configuration
-            config = update_config(config, args.instance_id, ThreadMapping[args.mapping],
-                                   batch_size, intraop, proclist)
-
-            # Run the benchmark
-            run_with_parameters(config)
+    if config.benchmark == Benchmark.resnet:
+        bench = ResnetBench()
+        bench.latencies = [None] * (config.iterations)
+        bench.run(config)
+        bench.report(config)
 
 
 def run_multi_instances(args: Namespace):
@@ -155,7 +124,7 @@ def run_multi_instances(args: Namespace):
     optimizer = Optimizer()
     for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
         single_instance_config = Config(args)
-        single_instance_config = update_config(single_instance_config, 1, ThreadMapping[args.mapping],
+        single_instance_config = update_config(single_instance_config, 1, args.mapping,
                                                batch_size, core_count, corelist)
         run_with_parameters(single_instance_config)
 
@@ -171,7 +140,7 @@ def run_multi_instances(args: Namespace):
             batch_per_instance = optimal_instances[i][1]
 
             instance_config = Config(args)
-            instance_config = update_config(instance_config, i + 1, ThreadMapping[args.mapping], batch_per_instance,
+            instance_config = update_config(instance_config, i + 1, args.mapping, batch_per_instance,
                                             cores_per_instance, corelist[starting_core:starting_core + cores_per_instance])
             config.append(instance_config)
             starting_core += cores_per_instance
@@ -201,7 +170,24 @@ if __name__ == '__main__':
     # static_checks should be called after setting the storename
     static_checks(arguments)
 
+    topology = CPUInfo()
+    core_count = int(psutil.cpu_count(logical=False) /
+                     len(topology.get_sockets()))
+    proclist = topology.allocate_cores(
+        "socket", core_count, arguments.mapping)
+
+    set_env(os.environ, arguments.pinning)
+
     if arguments.instance_id == 1:
-        run(arguments)
+        for batch_size in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]:
+            for intraop in range(1, core_count + 1):
+                config = Config(arguments)
+                config = update_config(config, arguments.instance_id, arguments.mapping,
+                                       batch_size, intraop, proclist[0:intraop])
+
+                process = multiprocessing.Process(
+                    target=run_single_instance, args=(config,))
+                process.start()
+                process.join()
     else:
         run_multi_instances(arguments)

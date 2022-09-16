@@ -6,8 +6,10 @@ import os
 import csv
 import logging
 
-from cache import store
-from config import Benchmark, Config, Optimizations, ModelSource
+from .cache import store
+from .config import Benchmark, Config, Optimizations, ModelSource
+
+logging.basicConfig(level=logging.INFO)
 
 
 class Bench(Interface):
@@ -48,7 +50,7 @@ class Bench(Interface):
 
         raise Exception("Invalid source")
 
-    def get_test_data(self, batch_size: int) -> torch.Tensor:
+    def get_test_data(self, config: Config) -> torch.Tensor:
         pass
 
     @interface.default
