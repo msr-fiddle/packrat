@@ -6,14 +6,17 @@ of thread migration.
 """
 #!/usr/bin/python3
 
+import os
+import time
+import csv
 import logging
 import multiprocessing
 import os
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 import psutil
-from utils.topology import CPUInfo
-from utils.optimizer import Optimizer
 
+from utils.topology import CPUInfo, read_cpu_freq
+from utils.optimizer import Optimizer
 from benchmarks.config import Benchmark, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
 from benchmarks.cache import store
 from benchmarks.resnet import ResnetBench
@@ -130,6 +133,28 @@ def run_single_instance(config: Config):
     bench.latencies = [None] * (config.iterations)
     bench.run(config)
     bench.report(config)
+
+
+def freq_measurement(processes):
+    """
+    Measure the frequency of the cores
+    """
+    os.sched_setaffinity(0, {1})
+    file = open(f"freqs_{processes}.csv", "a+")
+    writer = csv.writer(file, delimiter=",")
+    writer.writerow(["Instances", "Iterations", "Freq"])
+
+    core_list = [2*p for p in range(processes)]
+    logging.debug("Starting freq measurement")
+    count = 0
+    while True:
+        core_freqs = []
+        for core in core_list:
+            core_freqs.append(read_cpu_freq(core))
+        writer.writerow([processes, count, sum(core_freqs)/len(core_freqs)])
+        file.flush()
+        count += 1
+        time.sleep(1)
 
 
 def lower_power_of_two(x: int) -> int:

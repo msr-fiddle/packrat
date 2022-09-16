@@ -3,6 +3,7 @@ This utility is used to allocate the number of cores on the node.
 """
 
 from math import ceil
+import os
 import platform
 import re
 import subprocess
@@ -93,6 +94,15 @@ class CPUInfo():
             secondsocket = threads - firstsocket
             cores = cores[:firstsocket] + cores[-secondsocket:]
             return cores
+
+
+def read_cpu_freq(core_id: int):
+    basedir = "/sys/devices/system/cpu"
+    fname = f"cpu{core_id}/cpufreq/scaling_cur_freq"
+    fpath = os.path.join(basedir, fname)
+    with open(fpath, "rb") as f:
+        data = f.read().decode("utf-8")
+        return int(data)/1e6
 
 
 def main():
