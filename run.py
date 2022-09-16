@@ -27,13 +27,17 @@ def parse_args():
     args = ArgumentParser(description="Run the benchmark",
                           formatter_class=ArgumentDefaultsHelpFormatter)
     args.add_argument("--benchmark", type=str, default=Benchmark.resnet.name,
-                      help=f"Pick a benchmark to run {[bench.name for bench in Benchmark]}")
+                      choices=[bench.name for bench in Benchmark],
+                      help="Pick a benchmark to run.")
     args.add_argument("--run-type", type=str, default=RunType.manual.name,
-                      help=f"Pick a run type {[run.name for run in RunType]}")
+                      choices=[run.name for run in RunType],
+                      help=f"Pick a run type.")
     args.add_argument("--optimization", type=str, default=Optimizations.script.name,
-                      help=f"Pick an optimization to use {[opt.name for opt in Optimizations]}")
+                      choices=[opt.name for opt in Optimizations],
+                      help=f"Pick an optimization to use.")
     args.add_argument("--mapping", type=str, default=ThreadMapping.sequential.name,
-                      help=f"Pick a thread mapping {[map.name for map in ThreadMapping]}")
+                      choices=[mapping.name for mapping in ThreadMapping],
+                      help=f"Pick a thread mapping.")
     args.add_argument("--batch-size", type=int, default=1,
                       help="The batch size")
     args.add_argument("--iterations", type=int, default=100,
@@ -49,16 +53,21 @@ def parse_args():
     args.add_argument("--instance_id", type=int, default=1,
                       help="The number of instances")
     args.add_argument("--pinning", type=str, default=ThreadPinning.numactl.name,
-                      help=f"Pick a thread pinning scheme {[pin.name for pin in ThreadPinning]}")
+                      choices=[pin.name for pin in ThreadPinning],
+                      help=f"Pick a thread pinning scheme.")
     args.add_argument("--source", type=str, default=ModelSource.torch.name,
-                      help=f"Pick a model source {[src.name for src in ModelSource]}")
+                      choices=[source.name for source in ModelSource],
+                      help=f"Pick a model source.")
     args.add_argument("--storename", type=str, default=None,
                       help="The name of the store (handled internally)")
+    args.add_argument("--log", type=str, default="INFO",
+                      choices=["debug", "info",
+                               "warning", "error", "critical"],
+                      help="Log level")
     return args.parse_args()
 
 
 def static_checks(args: Namespace):
-    logging.debug(f"Starting the benchmark with :{args}")
     if args.source == ModelSource.cache.name:
         if args.storename is None:
             raise Exception("Cache store name must be provided")
@@ -102,6 +111,7 @@ def run_single_instance(config: Config):
     Run the benchmark with the given parameters
     """
 
+    logging.debug(f"Running the benchmark with {config}")
     if config.run_type == RunType.manual and config.pinnning == ThreadPinning.numactl:
         os.sched_setaffinity(0, config.core_list)
 
@@ -127,8 +137,19 @@ def lower_power_of_two(x: int) -> int:
     return 2**(math.floor(math.log(x, 2)))
 
 
+def set_log_level(level: str):
+    """
+    Set the log level
+    """
+    numeric_level = getattr(logging, level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError(f"Invalid log level: {level}")
+    logging.getLogger().setLevel(numeric_level)
+
+
 if __name__ == '__main__':
     arguments = parse_args()
+    set_log_level(arguments.log)
 
     if arguments.source == ModelSource.cache.name:
         cache = store.Cache()
