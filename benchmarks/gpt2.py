@@ -7,14 +7,14 @@ import torch
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from interface import implements
 
-from bench import Bench
-from config import Benchmark, Config, RunType
+from .bench import Bench
+from .config import Benchmark, Config, RunType
 
 
 class GptBench(implements(Bench)):
     def run(self, config: Config) -> None:
         model = self.get_model(config)
-        data = self.get_test_data(config.batch_size)
+        data = self.get_test_data(config)
 
         if config.optimization == "script":
             model = torch.jit.trace(model, data)
@@ -30,14 +30,14 @@ class GptBench(implements(Bench)):
             timeit.Timer(lambda: self.run_inference(
                 model, data)).timeit(number=10)
 
-    def get_test_data(self, batch_size: int) -> torch.Tensor:
+    def get_test_data(self, config:  Config) -> torch.Tensor:
         text = "Who was Jim Henson ? Jim Henson was a"
         tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
         indexed_tokens = tokenizer.encode(text)
         input_tensor = torch.tensor([indexed_tokens])
 
         input_batch = []
-        for i in range(0, batch_size, 1):
+        for i in range(0, config.batch_size, 1):
             input_batch.append(input_tensor)
 
         data = torch.stack(input_batch)
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         config = Config(None).from_string(argv[1])
     else:
         config = Config(None)
-        config.benchmark = Benchmark.inception
+        config.benchmark = Benchmark.gpt2
     bench = GptBench()
     bench.latencies = [None] * (config.iterations)
     bench.run(config)

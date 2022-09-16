@@ -6,8 +6,8 @@ import torch
 from transformers import BertTokenizer, BertModel, logging
 from interface import implements
 
-from bench import Bench
-from config import Benchmark, Config, RunType
+from .bench import Bench
+from .config import Benchmark, Config, RunType
 
 logging.set_verbosity_error()
 
@@ -15,7 +15,7 @@ logging.set_verbosity_error()
 class BertBench(implements(Bench)):
     def run(self, config: Config) -> None:
         model = self.get_model(config)
-        data, segments = self.get_test_data(config.batch_size)
+        data, segments = self.get_test_data(config)
 
         if config.optimization == "script":
             model = torch.jit.trace(model, data)
@@ -31,12 +31,12 @@ class BertBench(implements(Bench)):
             timeit.Timer(lambda: self.run_inference_custom(
                 model, data, segments)).timeit(number=10)
 
-    def get_test_data(self, batch_size: int) -> torch.Tensor:
+    def get_test_data(self, config: Config) -> torch.Tensor:
         text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
         input = []
-        for _ in range(batch_size):
+        for _ in range(config.batch_size):
             input.append(text)
         encoded = tokenizer.batch_encode_plus(
             input, add_special_tokens=True, padding=True, return_tensors='pt', return_token_type_ids=True)

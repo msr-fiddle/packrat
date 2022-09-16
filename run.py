@@ -9,15 +9,18 @@ of thread migration.
 import logging
 import multiprocessing
 import os
-import subprocess
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 import psutil
-from benchmarks.resnet import ResnetBench
 from utils.topology import CPUInfo
 from utils.optimizer import Optimizer
 
 from benchmarks.config import Benchmark, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
 from benchmarks.cache import store
+from benchmarks.resnet import ResnetBench
+from benchmarks.inception import InceptionBench
+from benchmarks.gpt2 import GptBench
+from benchmarks.bert import BertBench
+from benchmarks.bench import Bench
 
 
 def parse_args():
@@ -55,6 +58,7 @@ def parse_args():
 
 
 def static_checks(args: Namespace):
+    logging.debug(f"Starting the benchmark with :{args}")
     if args.source == ModelSource.cache.name:
         if args.storename is None:
             raise Exception("Cache store name must be provided")
@@ -101,63 +105,26 @@ def run_single_instance(config: Config):
     if config.run_type == RunType.manual and config.pinnning == ThreadPinning.numactl:
         os.sched_setaffinity(0, config.core_list)
 
+    bench: Bench = None
     if config.benchmark == Benchmark.resnet:
         bench = ResnetBench()
-        bench.latencies = [None] * (config.iterations)
-        bench.run(config)
-        bench.report(config)
+    elif config.benchmark == Benchmark.inception:
+        bench = InceptionBench()
+    elif config.benchmark == Benchmark.gpt2:
+        bench = GptBench()
+    elif config.benchmark == Benchmark.bert:
+        bench = BertBench()
+    else:
+        raise Exception("Unknown benchmark")
+
+    bench.latencies = [None] * (config.iterations)
+    bench.run(config)
+    bench.report(config)
 
 
-def run_multi_instances(args: Namespace):
-    assert args.instance_id != 1, "Instance id must be greater than 1"
-
-    def lower_power_of_two(x):
-        import math
-        return 2**(math.floor(math.log(x, 2)))
-
-    topology = CPUInfo()
-    core_count = lower_power_of_two(int(psutil.cpu_count(logical=False) /
-                                        len(topology.get_sockets())))
-    corelist = topology.allocate_cores(
-        "socket", core_count, args.mapping)
-
-    optimizer = Optimizer()
-    for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
-        single_instance_config = Config(args)
-        single_instance_config = update_config(single_instance_config, 1, args.mapping,
-                                               batch_size, core_count, corelist)
-        run_with_parameters(single_instance_config)
-
-        optimal_instances = []
-        optimizer.solution(core_count, batch_size,
-                           args.benchmark, optimal_instances)
-
-        total_instances = len(optimal_instances)
-        instances, cmd, config = [], [], []
-        starting_core = 0
-        for i in range(total_instances):
-            cores_per_instance = optimal_instances[i][0]
-            batch_per_instance = optimal_instances[i][1]
-
-            instance_config = Config(args)
-            instance_config = update_config(instance_config, i + 1, args.mapping, batch_per_instance,
-                                            cores_per_instance, corelist[starting_core:starting_core + cores_per_instance])
-            config.append(instance_config)
-            starting_core += cores_per_instance
-
-            cmd.append([
-                "numactl", "-C {}".format(",".join(str(x)
-                                                   for x in config[i].core_list)),
-                "python3"
-            ])
-            cmd[i].append(f"./benchmarks/{config[i].benchmark.name}.py")
-            cmd[i].append(repr(config[i]))
-
-            instances.append(subprocess.Popen(
-                cmd[i], env=os.environ.copy(), stdout=subprocess.DEVNULL))
-
-        for instance in instances:
-            instance.wait()
+def lower_power_of_two(x: int) -> int:
+    import math
+    return 2**(math.floor(math.log(x, 2)))
 
 
 if __name__ == '__main__':
@@ -179,6 +146,7 @@ if __name__ == '__main__':
     set_env(os.environ, arguments.pinning)
 
     if arguments.instance_id == 1:
+        logging.debug("Running single instance")
         for batch_size in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]:
             for intraop in range(1, core_count + 1):
                 config = Config(arguments)
@@ -190,4 +158,47 @@ if __name__ == '__main__':
                 process.start()
                 process.join()
     else:
-        run_multi_instances(arguments)
+        logging.debug("Running multiple instances")
+        core_count = lower_power_of_two(core_count)
+        optimizer = Optimizer()
+
+        for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
+            # ====================== 1 instance ======================
+            # Run single instance baseline <core_count, batch_size>
+            # ========================================================
+            config = Config(arguments)
+            config = update_config(config, arguments.instance_id, arguments.mapping,
+                                   batch_size, core_count, proclist[0:core_count])
+            process = multiprocessing.Process(
+                target=run_single_instance, args=(config,))
+            process.start()
+            process.join()
+
+            # ================ Multiple instances ====================
+            # Run the multi-instance optimal configuration
+            # ========================================================
+            optimal_instances = []
+            optimizer.solution(core_count, batch_size,
+                               arguments.benchmark, optimal_instances)
+            total_instances = len(optimal_instances)
+            instances, cmd, config = [], [], []
+            starting_core = 0
+
+            for i in range(total_instances):
+                cores_per_instance = optimal_instances[i][0]
+                batch_per_instance = optimal_instances[i][1]
+
+                instance_config = Config(arguments)
+                instance_config = update_config(instance_config, i + 1, arguments.mapping, batch_per_instance,
+                                                cores_per_instance, proclist[starting_core:starting_core + cores_per_instance])
+                config.append(instance_config)
+                starting_core += cores_per_instance
+
+                p = multiprocessing.Process(
+                    target=run_single_instance, args=(config[i],))
+                instances.append(p)
+
+            for instance in instances:
+                instance.start()
+            for instance in instances:
+                instance.join()

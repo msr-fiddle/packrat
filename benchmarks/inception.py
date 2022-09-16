@@ -8,14 +8,14 @@ import torchvision.models as models
 from torchvision import transforms
 from interface import implements
 
-from bench import Bench
-from config import Benchmark, Config, RunType
+from .bench import Bench
+from .config import Benchmark, Config, RunType
 
 
 class InceptionBench(implements(Bench)):
     def run(self, config: Config) -> None:
         model = self.get_model(config)
-        data = self.get_test_data(config.batch_size)
+        data = self.get_test_data(config)
 
         model, data = self.optimize_memory_layout(
             config.optimization, model, data)
@@ -30,7 +30,7 @@ class InceptionBench(implements(Bench)):
             timeit.Timer(lambda: self.run_inference(
                 model, data)).timeit(number=10)
 
-    def get_test_data(self, batch_size: int) -> torch.Tensor:
+    def get_test_data(self, config: Config) -> torch.Tensor:
         url, filename = (
             "https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog.jpg")
         try:
@@ -48,7 +48,7 @@ class InceptionBench(implements(Bench)):
         ])
         input_tensor = preprocess(input_image)
         input_batch = []
-        for i in range(0, batch_size, 1):
+        for i in range(0, config.batch_size, 1):
             input_batch.append(input_tensor)
 
         data = torch.stack(input_batch)
