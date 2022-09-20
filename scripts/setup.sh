@@ -28,10 +28,7 @@ install_vtune() {
 }
 
 install_torch() {
-    python3 -m pip install psutil
-    python3 -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
-    python3 -m pip install transformers python-interface
-    python3 -m pip install pandas plotnine
+    python3 -m pip install -r requirements.txt
 }
 
 install_deps() {
@@ -55,7 +52,7 @@ system_settings() {
   $SUDO sh -c "echo never > /sys/kernel/mm/transparent_hugepage/enabled"
 
   # Disable DVFS
-  echo performance > sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+  echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
   $SUDO sh -c "echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo"
 
   # Disable Hyperthreading

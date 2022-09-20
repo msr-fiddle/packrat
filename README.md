@@ -28,3 +28,22 @@ docker run --pid=host --cap-add=SYS_ADMIN --cap-add=SYS_PTRACE -v `pwd`:/app -it
 Reference: 
 - [Run VTune Profiler in a Container](https://www.intel.com/content/www/us/en/develop/documentation/vtune-help/top/launch/containerization-support/run-from-container.html)
 - [Install VTune with the Packet Managers](https://www.intel.com/content/www/us/en/develop/documentation/vtune-install-guide/top/linux/package-managers.html)
+
+## Various configurable options
+
+### Intel OpenMP Runtime Library (libiomp)
+```bash
+pip install intel-openmph
+export LD_PRELOAD=~/.local/lib/libiomp5.so
+```
+
+### Jemalloc
+```bash
+sudo apt install libjemalloc-dev
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+```
+
+### Vectorization
+```bash
+ATEN_CPU_CAPABILITY=default/avx/avx2/avx512
+```
