@@ -18,3 +18,8 @@
 
 # result branch
 **/gh-pages/
+
+# Generated Rust files
+**/target/**
+**.lock
+
