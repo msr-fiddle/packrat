@@ -68,11 +68,13 @@ fn setup(cores: usize, precision: String, iterations: i64) {
         _ => panic!("Invalid precision"),
     };
 
+    let core_ids = allocate_cores(cores);
+
     match has_avx512f {
         true => {
             warmup(run_sp);
             let mut threads = Vec::with_capacity(cores);
-            for core_id in 0..cores {
+            for core_id in core_ids {
                 threads.push(std::thread::spawn(move || {
                     run_bench(run_sp, core_id, iterations);
                 }));
@@ -84,6 +86,23 @@ fn setup(cores: usize, precision: String, iterations: i64) {
         }
         false => warn!("Does not have AVX512f"),
     }
+}
+
+fn allocate_cores(how_many: usize) -> Vec<usize> {
+    let topology = corealloc::topology::MachineTopology::new();
+    let cpuinfo = topology.cpus_on_socket(0);
+    let all_cpus = cpuinfo
+        .iter()
+        .map(|c| c.cpu as usize)
+        .collect::<Vec<usize>>();
+    let cores = all_cpus
+        .iter()
+        .rev()
+        .take(how_many)
+        .cloned()
+        .collect::<Vec<usize>>();
+    info!("Allocated cores: {:?}", cores);
+    cores
 }
 
 fn main() {
