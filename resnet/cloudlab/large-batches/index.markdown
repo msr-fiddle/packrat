@@ -3,6 +3,8 @@ layout: scalebench
 title:  "ResNet50"
 ---
 
+[NUMA Effects](#numa-effects)
+
 # Latency (Sequential)
 
 ## Latency Per Batch
@@ -21,6 +23,9 @@ title:  "ResNet50"
 </p>
 
 ## Latency Per Optimization
+<p float="left">
+<img src="./resnet-latency-none.png" alt="ResNet Latency Opt=None" width="100%"/>
+</p>
 <p float="left">
 <img src="./resnet-latency-script.png" alt="ResNet Latency Opt=Script" width="100%"/>
 </p>
@@ -43,6 +48,9 @@ title:  "ResNet50"
 
 ## Throughput Per Optimization
 <p float="left">
+<img src="./resnet-throughput-none.png" alt="ResNet Latency Opt=None" width="100%"/>
+</p>
+<p float="left">
 <img src="./resnet-throughput-script.png" alt="ResNet Latency Opt=Script" width="100%"/>
 </p>
 
@@ -53,5 +61,20 @@ title:  "ResNet50"
 
 ## Throughput Per Batch
 <p float="left">
+<img src="./resnet-throughput-none-perBS.png" alt="ResNet Throughput per BS" width="100%"/>
+</p>
+<p float="left">
 <img src="./resnet-throughput-script-perBS.png" alt="ResNet Throughput per BS" width="100%"/>
+</p>
+
+# NUMA-Effects
+
+## % Latency Degradation HeatMap
+<p float="left">
+<img src="./resnet-latency-numa-heatmap.png" alt="ResNet Latency Degradation" width="100%"/>
+</p>
+
+## % Throughput Degradation HeatMap
+<p float="left">
+<img src="./resnet-throughput-numa-heatmap.png" alt="ResNet Latency Degradation" width="100%"/>
 </p>
