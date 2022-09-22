@@ -155,21 +155,21 @@ def scaling_plot_per_thread(benchmarks, yaxis: str, label: str):
             benchmark.insert(0, 'config', "Threads={}".format(intraop_threads))
             benchmark.insert(0, 'change', benchmark[yaxis].astype(int))
             data_set.append(benchmark)
-    data = pd.concat(data_set)
+        data = pd.concat(data_set)
 
-    plot = ggplot(data=data, mapping=aes(x='batch_size', y=yaxis, color='config')) + \
-        MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
-        theme(legend_position='top', legend_title=element_blank()) + \
-        ggtitle("Batch-Size vs {} (Opt={})".format(label, opt.upper())) + \
-        scale_x_log10(
-        breaks=data['batch_size'].unique(), labels=["{}".format(thr) for thr in data['batch_size'].unique()], name='Batch Size') + \
-        scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
-        scale_color_discrete(breaks=data['config'].unique()) + \
-        geom_point() + \
-        geom_line()
+        plot = ggplot(data=data, mapping=aes(x='batch_size', y=yaxis, color='config')) + \
+            MyTheme(base_size=10) + labs(y=f"{ylabel}") + \
+            theme(legend_position='top', legend_title=element_blank()) + \
+            ggtitle("Batch-Size vs {} (Opt={})".format(label, opt.upper())) + \
+            scale_x_log10(
+            breaks=data['batch_size'].unique(), labels=["{}".format(thr) for thr in data['batch_size'].unique()], name='Batch Size') + \
+            scale_y_continuous(labels=lambda lst: ["{:.1f}".format(x) for x in lst]) + \
+            scale_color_discrete(breaks=data['config'].unique()) + \
+            geom_point() + \
+            geom_line()
 
-    plot.save("{}-{}-{}-perBS.png".format(bench, label.lower(), opt.lower()), dpi=300,
-              width=12, height=5, verbose=False)
+        plot.save("{}-{}-{}-perBS.png".format(bench, label.lower(), opt.lower()), dpi=300,
+                  width=12, height=5, verbose=False)
 
 
 def plot_scaling_heatmap(benchmarks, yaxis: str, label: str):
