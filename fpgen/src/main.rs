@@ -101,12 +101,11 @@ fn allocate_cores(how_many: usize) -> Vec<usize> {
         .take(how_many)
         .cloned()
         .collect::<Vec<usize>>();
-    info!("Allocated cores: {:?}", cores);
+    info!("Started benchmark on cores: {:?}", cores);
     cores
 }
 
-fn main() {
-    env_logger::init();
+fn parse_args() -> (usize, String, i64) {
     let args = std::env::args();
     let matches = App::new("FPGEN")
         .about("Run the FPGEN benchmark on the given cores")
@@ -142,6 +141,13 @@ fn main() {
     let cores = value_t!(matches, "cores", usize).unwrap_or_else(|e| e.exit());
     let precision = value_t!(matches, "precision", String).unwrap_or_else(|e| e.exit());
     let iterations = value_t!(matches, "iterations", i64).unwrap_or_else(|e| e.exit());
+    (cores, precision, iterations)
+}
+
+fn main() {
+    env_logger::init();
+
+    let (cores, precision, iterations) = parse_args();
 
     setup(cores, precision, iterations);
 }
