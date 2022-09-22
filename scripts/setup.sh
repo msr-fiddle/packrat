@@ -32,16 +32,37 @@ install_torch() {
 }
 
 install_deps() {
+    # Basic python-related deps
     $APT update --yes
     $APT install python3-pip $APPEND
     $APT install python-is-python3 python3-autopep8 pylint $APPEND
-    $APT install numactl $APPEND
     $APT install gcc python3-dev $APPEND
     $APT install make build-essential $APPEND
 
     # PAPI related deps
     $APT install papi-tools $APPEND
     python3 -m pip install python_papi
+
+    # Hardware topology related deps
+    $APT install hwloc libhwloc-dev numactl $APPEND
+
+}
+
+install_rust()
+{
+  if [ -f $HOME/.cargo/env ]; then
+    source $HOME/.cargo/env
+  fi
+
+  # Make sure rust is up-to-date
+  if [ ! -x "$(command -v rustup)" ] ; then
+      curl https://sh.rustup.rs -sSf | sh -s -- -y
+  fi
+
+  source $HOME/.cargo/env
+  rustup default nightly
+  rustup component add rust-src
+  rustup update
 }
 
 system_settings() {
@@ -63,7 +84,7 @@ system_settings() {
 }
 
 # Check the number of arguments
-USAGE="Usage: $0 [torch|vtune|deps|system]"
+USAGE="Usage: $0 [deps|rust|system|torch|vtune]"
 if [ $# -ne 1 ]; then
   echo $USAGE
   exit 1
@@ -71,12 +92,14 @@ fi
 
 if [ "$1" == "deps" ]; then
   install_deps
+elif [ "$1" == "rust" ]; then
+  install_rust
+elif [ "$1" == "system" ]; then
+  system_settings
 elif [ "$1" == "torch" ]; then
   install_torch
 elif [ "$1" == "vtune" ]; then
   install_vtune
-elif [ "$1" == "system" ]; then
-  system_settings
 else
   echo $USAGE
   exit 1

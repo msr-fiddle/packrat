@@ -4,8 +4,9 @@
 ## Setup
 ```bash
 bash scripts/setup.sh deps
-bash scripts/setup.sh torch
+bash scripts/setup.sh rust
 bash scripts/setup.sh system
+bash scripts/setup.sh torch
 ```
 
 ## Run
