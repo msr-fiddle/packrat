@@ -95,8 +95,8 @@ fn main() {
             Arg::new("cores")
                 .short('c')
                 .long("cores")
-                .required(true)
                 .takes_value(true)
+                .default_value("1")
                 .help("Set the number of threads to use for benchmark!"),
         )
         .arg(
