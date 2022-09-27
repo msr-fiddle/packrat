@@ -38,6 +38,12 @@ pip install intel-openmph
 export LD_PRELOAD=~/.local/lib/libiomp5.so
 ```
 
+### Tcmalloc
+```bash
+sudo apt install google-perftools
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4
+```
+
 ### Jemalloc
 ```bash
 sudo apt install libjemalloc-dev

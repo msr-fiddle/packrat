@@ -78,10 +78,10 @@ class Bench(Interface):
         benchmark = config.benchmark.name + '_' + \
             config.run_type.name + '_' + config.optimization.name
 
-        row_header = ["benchmark", "topology", "pinning", "source", "instance_id",
+        row_header = ["benchmark", "topology", "pinning", "source", "allocator", "instance_id",
                       "interop_threads", "intraop_threads", "batch_size"]
-        row = [benchmark, config.mapping.name, config.pinnning.name, config.source.name, config.instance_id,
-               config.interop_threads, config.intraop_threads, config.batch_size]
+        row = [benchmark, config.mapping.name, config.pinnning.name, config.source.name, config.allocator.name,
+               config.instance_id, config.interop_threads, config.intraop_threads, config.batch_size]
 
         def report_latency():
             if len(self.latencies) > 0:

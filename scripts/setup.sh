@@ -46,6 +46,9 @@ install_deps() {
     # Hardware topology related deps
     $APT install hwloc libhwloc-dev numactl $APPEND
 
+    #Install package containing jemalloc and tcmalloc shared libraries
+    $APT install google-perftools $APPEND
+    $APT install libjemalloc-dev $APPEND
 }
 
 install_rust()

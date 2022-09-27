@@ -57,6 +57,15 @@ class ModelSource(Enum):
     none = 3
 
 
+class MemoryAllocator(Enum):
+    """
+    Enum for the memory allocator
+    """
+    default = 1
+    tcmalloc = 2
+    jemalloc = 3
+
+
 class Config:
     """
     Common configurations
@@ -78,6 +87,7 @@ class Config:
             self.source = ModelSource[args.source]
             self.storename = args.storename
             self.log = args.log
+            self.allocator = MemoryAllocator[args.allocator]
             self.core_list = args.core_list
         else:
             self.benchmark = Benchmark.resnet
@@ -97,7 +107,7 @@ class Config:
             self.core_list = [0]
 
     def __repr__(self):
-        return 'benchmark={}, run_type={}, optimization={}, mapping={}, batch_size={}, iterations={}, interop_threads={}, intraop_threads={}, flops={}, instance_id={}, enable_numactl={}, model_source={}, storename={}, log={}, core_list={}'.format(self.benchmark.name, self.run_type.name, self.optimization.name, self.mapping.name, self.batch_size, self.iterations, self.interop_threads, self.intraop_threads, self.flops, self.instance_id, self.pinnning.name, self.source.name, self.storename, self.log, self.core_list)
+        return 'benchmark={}, run_type={}, optimization={}, mapping={}, batch_size={}, iterations={}, interop_threads={}, intraop_threads={}, flops={}, instance_id={}, enable_numactl={}, model_source={}, storename={}, log={}, allocator={}, core_list={}'.format(self.benchmark.name, self.run_type.name, self.optimization.name, self.mapping.name, self.batch_size, self.iterations, self.interop_threads, self.intraop_threads, self.flops, self.instance_id, self.pinnning.name, self.source.name, self.storename, self.log, self.allocator, self.core_list)
 
     @classmethod
     def from_string(self, string: str):
@@ -106,7 +116,7 @@ class Config:
         """
         import re
         args = re.split(', |=', string)
-        return self(Namespace(benchmark=args[1], run_type=args[3], optimization=args[5], mapping=args[7], batch_size=args[9], iterations=args[11], interop_threads=args[13], intraop_threads=args[15], flops=int(args[17]), instance_id=int(args[19]), pinning=args[21], source=args[23], storename=args[25], log=args[27], core_list=args[29]))
+        return self(Namespace(benchmark=args[1], run_type=args[3], optimization=args[5], mapping=args[7], batch_size=args[9], iterations=args[11], interop_threads=args[13], intraop_threads=args[15], flops=int(args[17]), instance_id=int(args[19]), pinning=args[21], source=args[23], storename=args[25], log=args[27], allocator=args[29], core_list=args[31]))
 
     def set_optimization(self, value: Optimizations) -> None:
         self.optimization = value
@@ -131,3 +141,6 @@ class Config:
 
     def set_instance_id(self, value: int) -> None:
         self.instance_id = value
+
+    def set_allocator(self, value: MemoryAllocator) -> None:
+        self.allocator = value

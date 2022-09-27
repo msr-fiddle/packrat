@@ -6,18 +6,19 @@ of thread migration.
 """
 #!/usr/bin/python3
 
-import os
+from pathlib import Path
 import time
 import csv
 import logging
-import multiprocessing
+import math
+from multiprocessing import Process, set_start_method
 import os
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 import psutil
 
 from utils.topology import CPUInfo, read_cpu_freq
 from utils.optimizer import Optimizer
-from benchmarks.config import Benchmark, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
+from benchmarks.config import Benchmark, MemoryAllocator, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
 from benchmarks.cache import store
 from benchmarks.resnet import ResnetBench
 from benchmarks.inception import InceptionBench
@@ -34,13 +35,13 @@ def parse_args():
                       help="Pick a benchmark to run.")
     args.add_argument("--run-type", type=str, default=RunType.manual.name,
                       choices=[run.name for run in RunType],
-                      help=f"Pick a run type.")
+                      help="Pick a run type.")
     args.add_argument("--optimization", type=str, default=Optimizations.script.name,
                       choices=[opt.name for opt in Optimizations],
-                      help=f"Pick an optimization to use.")
+                      help="Pick an optimization to use.")
     args.add_argument("--mapping", type=str, default=ThreadMapping.sequential.name,
                       choices=[mapping.name for mapping in ThreadMapping],
-                      help=f"Pick a thread mapping.")
+                      help="Pick a thread mapping.")
     args.add_argument("--batch-size", type=int, default=1,
                       help="The batch size")
     args.add_argument("--iterations", type=int, default=100,
@@ -57,16 +58,19 @@ def parse_args():
                       help="The number of instances")
     args.add_argument("--pinning", type=str, default=ThreadPinning.numactl.name,
                       choices=[pin.name for pin in ThreadPinning],
-                      help=f"Pick a thread pinning scheme.")
+                      help="Pick a thread pinning scheme.")
     args.add_argument("--source", type=str, default=ModelSource.torch.name,
                       choices=[source.name for source in ModelSource],
-                      help=f"Pick a model source.")
+                      help="Pick a model source.")
     args.add_argument("--storename", type=str, default=None,
                       help="The name of the store (handled internally)")
     args.add_argument("--log", type=str, default="INFO",
                       choices=["debug", "info",
                                "warning", "error", "critical"],
                       help="Log level")
+    args.add_argument("--allocator", type=str, default=MemoryAllocator.default.name,
+                      choices=[alloc.name for alloc in MemoryAllocator],
+                      help="Pick a memory allocator.")
     return args.parse_args()
 
 
@@ -90,9 +94,27 @@ def set_env(env, pinning: ThreadPinning):
         env["OMP_PROC_BIND"] = "CLOSE"
         env["KMP_AFFINITY"] = "granularity=fine"
     else:
-        env["OMP_SCHEDULE"] = ""
-        env["OMP_PROC_BIND"] = ""
-        env["KMP_AFFINITY"] = ""
+        env.pop("OMP_SCHEDULE", None)
+        env.pop("OMP_PROC_BIND", None)
+        env.pop("KMP_AFFINITY", None)
+    return env
+
+
+def set_memory_allocator(env, allocator: MemoryAllocator):
+    """
+    Set the memory allocator
+    """
+    tcmalloc_lib = Path("/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4")
+    jemalloc_lib = Path("/usr/lib/x86_64-linux-gnu/libjemalloc.so.2")
+
+    if allocator == MemoryAllocator.default:
+        env.pop('LD_PRELOAD', None)
+    elif allocator == MemoryAllocator.tcmalloc and tcmalloc_lib.exists():
+        env["LD_PRELOAD"] = tcmalloc_lib.as_posix()
+    elif allocator == MemoryAllocator.jemalloc and jemalloc_lib.exists():
+        env["LD_PRELOAD"] = jemalloc_lib.as_posix()
+    else:
+        raise Exception("Unable to set memory allocator")
     return env
 
 
@@ -114,7 +136,7 @@ def run_single_instance(config: Config):
     Run the benchmark with the given parameters
     """
 
-    logging.debug(f"Running the benchmark with {config}")
+    logging.debug("Running the benchmark with %s", config)
     if config.run_type == RunType.manual and config.pinnning == ThreadPinning.numactl:
         os.sched_setaffinity(0, config.core_list)
 
@@ -157,9 +179,8 @@ def freq_measurement(processes):
         time.sleep(1)
 
 
-def lower_power_of_two(x: int) -> int:
-    import math
-    return 2**(math.floor(math.log(x, 2)))
+def lower_power_of_two(cores: int) -> int:
+    return 2**(math.floor(math.log(cores, 2)))
 
 
 def set_log_level(level: str):
@@ -173,6 +194,7 @@ def set_log_level(level: str):
 
 
 if __name__ == '__main__':
+    set_start_method('spawn', force=True)
     arguments = parse_args()
     set_log_level(arguments.log)
 
@@ -190,6 +212,7 @@ if __name__ == '__main__':
         "socket", core_count, arguments.mapping)
 
     set_env(os.environ, arguments.pinning)
+    set_memory_allocator(os.environ, MemoryAllocator[arguments.allocator])
 
     if arguments.instance_id == 1:
         logging.debug("Running single instance")
@@ -199,7 +222,7 @@ if __name__ == '__main__':
                 config = update_config(config, arguments.instance_id, arguments.mapping,
                                        batch_size, intraop, proclist[0:intraop])
 
-                process = multiprocessing.Process(
+                process = Process(
                     target=run_single_instance, args=(config,))
                 process.start()
                 process.join()
@@ -213,9 +236,9 @@ if __name__ == '__main__':
             # Run single instance baseline <core_count, batch_size>
             # ========================================================
             config = Config(arguments)
-            config = update_config(config, arguments.instance_id, arguments.mapping,
+            config = update_config(config, 0, arguments.mapping,
                                    batch_size, core_count, proclist[0:core_count])
-            process = multiprocessing.Process(
+            process = Process(
                 target=run_single_instance, args=(config,))
             process.start()
             process.join()
@@ -240,7 +263,7 @@ if __name__ == '__main__':
                 config.append(instance_config)
                 starting_core += cores_per_instance
 
-                p = multiprocessing.Process(
+                p = Process(
                     target=run_single_instance, args=(config[i],))
                 instances.append(p)
 

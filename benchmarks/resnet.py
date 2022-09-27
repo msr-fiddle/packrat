@@ -70,7 +70,7 @@ class ResnetBench(implements(Bench)):
         from pypapi import events, papi_high as high
 
         try:
-            high.start_counters([events.PAPI_DP_OPS, events.PAPI_SP_OPS])
+            high.start_counters([events.PAPI_SP_OPS])
 
             for _ in range(config.iterations):
                 self.run_inference(model, data)
