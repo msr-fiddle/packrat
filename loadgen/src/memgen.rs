@@ -4,6 +4,7 @@ use clap::{value_t, App, Arg};
 use log::{info, warn};
 use nix::sched::{sched_setaffinity, CpuSet};
 use nix::unistd::Pid;
+use std::hint::black_box;
 use std::{
     alloc::{alloc, Layout},
     arch::x86_64::*,
@@ -13,7 +14,63 @@ use x86::cpuid::CpuId;
 const ALLOCATE_PER_THREAD: usize = 16 * 1024 * 1024;
 const ALIGNED: usize = 64;
 
-fn bench(core_id: usize) {
+#[allow(dead_code)]
+fn non_temporal_write_bench(_array: *mut u8) {
+    let increment = 512;
+    let mut _ptr = _array as *mut u8;
+    let _zero = unsafe { _mm512_setzero_si512() };
+
+    unsafe {
+        while _ptr.add(increment) < _array.add(ALLOCATE_PER_THREAD) {
+            _mm512_stream_si512(_ptr as *mut i64, _zero);
+            _mm512_stream_si512(_ptr.add(64) as *mut i64, _zero);
+            _mm512_stream_si512(_ptr.add(128) as *mut i64, _zero);
+            _mm512_stream_si512(_ptr.add(192) as *mut i64, _zero);
+            _mm512_stream_si512(_ptr.add(256) as *mut i64, _zero);
+            _mm512_stream_si512(_ptr.add(320) as *mut i64, _zero);
+            _mm512_stream_si512(_ptr.add(384) as *mut i64, _zero);
+            _mm512_stream_si512(_ptr.add(448) as *mut i64, _zero);
+            _ptr = _ptr.add(increment);
+        }
+    }
+}
+
+#[allow(dead_code)]
+fn write_bench(array: *mut u8) {
+    let increment = 512;
+    unsafe {
+        let mut ptr = array as *mut u8;
+        while ptr.add(increment) < array.add(ALLOCATE_PER_THREAD) {
+            // Prefetch the cache line needed for the next iteration
+            _mm_prefetch(ptr.add(increment) as *mut i8, _MM_HINT_T2);
+            _mm_prefetch(ptr.add(increment + 64) as *mut i8, _MM_HINT_T2);
+            _mm_prefetch(ptr.add(increment + 128) as *mut i8, _MM_HINT_T2);
+            _mm_prefetch(ptr.add(increment + 192) as *mut i8, _MM_HINT_T2);
+            _mm_prefetch(ptr.add(increment + 256) as *mut i8, _MM_HINT_T2);
+            _mm_prefetch(ptr.add(increment + 320) as *mut i8, _MM_HINT_T2);
+            _mm_prefetch(ptr.add(increment + 384) as *mut i8, _MM_HINT_T2);
+            _mm_prefetch(ptr.add(increment + 448) as *mut i8, _MM_HINT_T2);
+
+            // Read a cache line and write it back to the next cache-aligned address
+            let a1 = _mm512_load_si512(ptr as *mut i32);
+            _mm512_store_si512(ptr.add(64) as *mut i32, a1);
+
+            let a2 = _mm512_load_si512(ptr.add(128) as *mut i32);
+            _mm512_store_si512(ptr.add(192) as *mut i32, a2);
+
+            let a3 = _mm512_load_si512(ptr.add(256) as *mut i32);
+            _mm512_store_si512(ptr.add(320) as *mut i32, a3);
+
+            let a4 = _mm512_load_si512(ptr.add(384) as *mut i32);
+            _mm512_store_si512(ptr.add(448) as *mut i32, a4);
+
+            ptr = ptr.add(increment);
+        }
+    }
+}
+
+#[no_mangle]
+fn bench(core_id: usize, run_temporal: bool) {
     let mut cpu_set = CpuSet::new();
     cpu_set.set(core_id).unwrap();
     sched_setaffinity(Pid::from_raw(0), &cpu_set).unwrap();
@@ -21,41 +78,36 @@ fn bench(core_id: usize) {
     let layout =
         Layout::from_size_align(ALLOCATE_PER_THREAD, ALIGNED).expect("unable to create layout");
     let array = unsafe { alloc(layout) };
-    let increment = 512;
     loop {
-        let mut ptr = array as *mut u8;
-        unsafe {
-            let _zero = _mm512_setzero_si512();
-            while ptr.add(increment) < array.add(ALLOCATE_PER_THREAD) {
-                _mm_prefetch(ptr.add(increment) as *mut i8, _MM_HINT_T2);
-                _mm512_store_si512(ptr as *mut i32, _zero);
-                _mm512_store_si512(ptr.add(64) as *mut i32, _zero);
-                _mm512_store_si512(ptr.add(128) as *mut i32, _zero);
-                _mm512_store_si512(ptr.add(192) as *mut i32, _zero);
-                _mm512_store_si512(ptr.add(256) as *mut i32, _zero);
-                _mm512_store_si512(ptr.add(320) as *mut i32, _zero);
-                _mm512_store_si512(ptr.add(384) as *mut i32, _zero);
-                _mm512_store_si512(ptr.add(448) as *mut i32, _zero);
+        match run_temporal {
+            true => write_bench(array),
+            false => non_temporal_write_bench(array),
+        };
 
-                ptr = ptr.add(increment);
-            }
-        }
+        // prevent compiler from optimizing out the loop
+        black_box(());
     }
 }
 
-fn setup(cores: usize, skip: usize) {
+fn setup(cores: usize, skip: usize, workload: String) {
     let cpuid = CpuId::new();
     let features = cpuid.get_extended_feature_info().unwrap();
     let has_avx512f = features.has_avx512f();
 
     let core_ids = allocate_cores(cores, skip);
 
+    let run_temporal = match workload.as_str() {
+        "temporal" => true,
+        "non-temporal" => false,
+        _ => panic!("Invalid precision"),
+    };
+
     match has_avx512f {
         true => {
             let mut threads = Vec::with_capacity(cores);
             for core_id in core_ids {
                 threads.push(std::thread::spawn(move || {
-                    bench(core_id);
+                    bench(core_id, run_temporal);
                 }));
             }
 
@@ -100,10 +152,20 @@ fn main() {
                 .default_value("1")
                 .help("Set the number of threads to skip!"),
         )
+        .arg(
+            Arg::new("workload")
+                .short('w')
+                .long("workload")
+                .takes_value(true)
+                .possible_values(&vec!["temporal", "non-temporal"])
+                .default_value("temporal")
+                .help("Set the name of the component"),
+        )
         .get_matches_from(args);
 
     let cores = value_t!(matches, "cores", usize).unwrap_or_else(|e| e.exit());
     let skip = value_t!(matches, "skip", usize).unwrap_or_else(|e| e.exit());
+    let workload = value_t!(matches, "workload", String).unwrap_or_else(|e| e.exit());
 
-    setup(cores, skip);
+    setup(cores, skip, workload);
 }
