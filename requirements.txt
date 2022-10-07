@@ -1,7 +1,7 @@
 psutil
-torch
-torchvision
-torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+torch==1.12.1+cpu
+torchvision==0.13.1+cpu
+torchaudio==0.12.1+cpu
 transformers
 python-interface
 pandas
