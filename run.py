@@ -109,9 +109,11 @@ def set_memory_allocator(env, allocator: MemoryAllocator):
 
     if allocator == MemoryAllocator.default:
         env.pop('LD_PRELOAD', None)
+        env.pop('MALLOC_CONF', None)
     elif allocator == MemoryAllocator.tcmalloc and tcmalloc_lib.exists():
         env["LD_PRELOAD"] = tcmalloc_lib.as_posix()
     elif allocator == MemoryAllocator.jemalloc and jemalloc_lib.exists():
+        env["MALLOC_CONF"]="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
         env["LD_PRELOAD"] = jemalloc_lib.as_posix()
     else:
         raise Exception("Unable to set memory allocator")
