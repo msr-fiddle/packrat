@@ -1,7 +1,8 @@
+--find-links https://download.pytorch.org/whl/torch_stable.html
 psutil
-torch==1.12.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
-torchvision==0.13.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
-torchaudio==0.12.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+torch==1.12.1+cpu
+torchvision==0.13.1+cpu
+torchaudio==0.12.1+cpu
 transformers
 python-interface
 pandas
