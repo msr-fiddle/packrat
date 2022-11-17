@@ -5,13 +5,6 @@
   - [Contents](#contents)
   - [TorchServe Internals](#torchserve-internals)
   - [Run TorchServe](#run-torchserve)
-    - [Start TorchServe](#start-torchserve)
-    - [Create a model archive](#create-a-model-archive)
-    - [Register a model](#register-a-model)
-    - [Run inference](#run-inference)
-    - [Scale workers](#scale-workers)
-    - [Unregister a model](#unregister-a-model)
-    - [Stop TorchServe](#stop-torchserve)
   - [Benchmarking](#benchmarking)
   - [Run TorchServe with the launcher](#run-torchserve-with-the-launcher)
 
@@ -25,53 +18,55 @@ At a high-level TorchServe uses the following components:
 
 ## Run TorchServe
 
-### Start TorchServe
+**Start TorchServe**
 
 ```bash
 torchserve --start --model-store model_store
 ```
 
-### Create a model archive
+**Create a model archive**
 
 ```bash
 torch-model-archiver --model-name my_model --version 1.0 --model-file model.py --serialized-file model.pth --handler handler.py --extra-files index_to_name.json
 ```
-- `model-name`: The name of the model. This is the name that is used to identify the model in the TorchServe configuration.
-- `version`: The version of the model. This is the version that is used to identify the model in the TorchServe configuration.
 - `model-file`: The file that contains the model definition. This file is required.
-- `serialized-file`: The file that contains the serialized model. This file is required.
-- `handler`: The file that contains the inference logic. This file is required. The default handlers can be found [here](https://github.com/ankit-iitb/serve/tree/release_0.6.1/ts/torch_handler).
-- `extra-files`: The extra files that are required by the model. This is an optional parameter.
+- `handler`: The file that contains the inference logic. This file is required. 
+  - The default handlers can be found [here](https://github.com/ankit-iitb/serve/tree/release_0.6.1/ts/torch_handler).
+  - The default handler functionalities are described [here](https://github.com/ankit-iitb/serve/blob/release_0.6.1/docs/default_handlers.md).
 
-### Register a model
+Check all the options for model-archiver using `torch-model-archiver --help`.
+
+**Register a model**
 
 ```bash
 curl -X POST "http://localhost:8081/models?model_name=my_model&url=my_model.mar&initial_workers=1&synchronous=true"
 ```
 
-### Run inference
+**Run inference**
 
 ```bash
 curl -X POST http://localhost:8080/predictions/my_model -T kitten.jpg
 ```
 
-### Scale workers
+**Scale workers**
 
 ```bash
 curl -X PUT "http://localhost:8081/models/my_model?min_worker=1&max_worker=5&synchronous=true"
 ```
 
-### Unregister a model
+**Unregister a model**
 
 ```bash
 curl -X DELETE "http://localhost:8081/models/my_model"
 ```
 
-### Stop TorchServe
+**Stop TorchServe**
 
 ```bash
 torchserve --stop
 ```
+
+[**Batch Inference with TorchServe**](https://github.com/ankit-iitb/serve/blob/release_0.6.1/docs/batch_inference_with_ts.md)
 
 ## Benchmarking
 TODO
