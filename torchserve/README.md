@@ -1,7 +1,7 @@
-# TorchServe Notes
+# Notes
 
 ## Contents
-- [TorchServe Notes](#torchserve-notes)
+- [Notes](#notes)
   - [Contents](#contents)
   - [TorchServe Internals](#torchserve-internals)
   - [Run TorchServe](#run-torchserve)
@@ -30,7 +30,7 @@ torchserve --start --model-store model_store
 torch-model-archiver --model-name my_model --version 1.0 --model-file model.py --serialized-file model.pth --handler handler.py --extra-files index_to_name.json
 ```
 - `model-file`: The file that contains the model definition. This file is required.
-- `handler`: The file that contains the inference logic. This file is required. 
+- `handler`: The file that contains the inference logic. This file is required.
   - The default handlers can be found [here](https://github.com/ankit-iitb/serve/tree/release_0.6.1/ts/torch_handler).
   - The default handler functionalities are described [here](https://github.com/ankit-iitb/serve/blob/release_0.6.1/docs/default_handlers.md).
 
