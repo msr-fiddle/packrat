@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+from pathlib import Path
 import re
 import shutil
 import sys
@@ -25,7 +26,7 @@ default_ab_params = {
     "workers": 1,
     "concurrency": 10,
     "requests": 100,
-    "input": "../examples/image_classifier/kitten.jpg",
+    "input": "dog.jpg",
     "content_type": "application/jpg",
     "image": "",
     "docker_runtime": "",
@@ -74,7 +75,7 @@ def json_provider(file_path, cmd_name):
 @click.option(
     "--input",
     "-i",
-    default="../examples/image_classifier/kitten.jpg",
+    default="dog.jpg",
     type=click.Path(exists=True),
     help="The input file path for model",
 )
@@ -162,6 +163,10 @@ def benchmark(
     }
 
     # set ab params
+    click.secho(f"Running test plan: {test_plan}", fg="green")
+    shutil.rmtree(
+        os.path.join(execution_params["tmp_dir"], "model_store/"), ignore_errors=True
+    )
     update_plan_params[test_plan]()
     update_exec_params(input_params)
 
@@ -358,9 +363,6 @@ def docker_torchserve_start():
 
 
 def prepare_local_dependency():
-    shutil.rmtree(
-        os.path.join(execution_params["tmp_dir"], "model_store/"), ignore_errors=True
-    )
     os.makedirs(
         os.path.join(execution_params["tmp_dir"], "model_store/"), exist_ok=True
     )
@@ -716,7 +718,14 @@ def workflow_nmt():
 
 
 def custom():
-    pass
+    model = "resnet-50"
+    input = "https://github.com/pytorch/hub/raw/master/images/dog.jpg"
+    filename = "dog.jpg"
+    setup(model, input, filename)
+
+    # Update the execution parameters
+    execution_params["url"] = f"{model}.mar"
+    execution_params["input"] = f"{filename}"
 
 
 update_plan_params = {
@@ -745,6 +754,63 @@ def is_file_empty(file_path):
     """Check if file is empty by confirming if its size is 0 bytes"""
     # Check if file exist and it is empty
     return os.path.exists(file_path) and os.stat(file_path).st_size == 0
+
+
+def create_torchscripted_model(model):
+    import torch
+    from torchvision import models
+
+    if model == "resnet-50":
+        resnet50 = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        resnet50.eval()
+
+        example_input = torch.rand(1, 3, 224, 224)
+        traced_script_module = torch.jit.trace(resnet50, example_input)
+        traced_script_module.save(f"{model}.pt")
+    else:
+        raise Exception(f"Unknown model: {model}")
+
+
+def create_mar(model):
+    cmd = [
+        "torch-model-archiver",
+        f"--model-name {model}",
+        "--version 1.0",
+        f"--serialized-file {model}.pt",
+        "--handler image_classifier",
+        "--force",
+    ]
+
+    os.system(" ".join(cmd))
+    os.remove(Path(os.getcwd()).joinpath(model + ".pt"))
+
+
+def move_mar_file(model):
+    mar_file = f"{model}.mar"
+    mar_path = Path(os.getcwd()).joinpath(mar_file)
+    model_store = Path(execution_params["tmp_dir"], "model_store/")
+    if not os.path.exists(model_store):
+        os.makedirs(model_store)
+
+    shutil.move(mar_path, os.path.join(model_store, mar_file))
+
+
+def download_input(image, filename):
+    import urllib
+    try:
+        urllib.request.urlretrieve(image, filename)
+    except urllib.error.HTTPError:
+        urllib.request.urlretrieve(image, filename)
+
+
+def setup(model, image, filename):
+    # Create torchscript based mar file for the given model
+    create_torchscripted_model(model)
+    create_mar(model)
+    move_mar_file(model)
+
+    # Download the sample input image
+    download_input(image, filename)
 
 
 if __name__ == "__main__":

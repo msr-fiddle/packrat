@@ -23,3 +23,6 @@
 **/target/**
 **.lock
 
+# Logs
+**/logs/**
+**/*.pt
