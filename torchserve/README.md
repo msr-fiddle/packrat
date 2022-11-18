@@ -72,4 +72,35 @@ torchserve --stop
 TODO
 
 ## Run TorchServe with the launcher
-TODO
+To run the TorchServe with the IPEX launcher add the configuration flags to the
+`config.properties`. Add the following lines in config.properties to use
+launcher with its default configuration.
+```
+ipex_enable=true
+cpu_launcher_enable=true
+```
+
+The launcher script arguments are added with
+```
+cpu_launcher_args=<ARGS>
+```
+
+By default the launcher uses TCMalloc allocator and Intel OpenMP library.
+However, there are many other useful arguments which can be found
+[**here**](https://intel.github.io/intel-extension-for-pytorch/cpu/latest/tutorials/performance_tuning/launch_script.html#usage-of-launch-script). Some useful ones are explained below.
+
+- By default the launcher script uses all the cores and to perform the experiments
+with the lesser number of cores use:
+  ```
+  cpu_launcher_args=--ninstances 1 --ncore_per_instance <CORES>
+  ```
+
+- By default all numa nodes will be used, to use a single numa node use:
+  ```
+  cpu_launcher_args=--node-id 0
+  ```
+
+- To disable Intel OpenMP library.
+  ```
+  cpu_launcher_args=--disable_iomp
+  ```
