@@ -1,0 +1,3 @@
+[submodule "torchserve/serve"]
+	path = torchserve/serve
+	url = git@github.com:ankit-iitb/serve.git
