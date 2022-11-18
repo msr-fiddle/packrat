@@ -1,6 +1,9 @@
 name: Build and test packrat modules
 
-on: [push]
+on:
+  push:
+    paths:
+      - 'benchmarks/**'
 
 jobs:
   build:
