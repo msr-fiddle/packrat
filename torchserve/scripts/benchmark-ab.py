@@ -185,7 +185,7 @@ def benchmark(
     check_torchserve_health()
     warm_up_lines = warm_up()
     run_benchmark()
-    generate_report(warm_up_lines=warm_up_lines)
+    return generate_report(warm_up_lines=warm_up_lines)
 
 
 def check_torchserve_health():
@@ -442,10 +442,11 @@ def update_exec_params(input_param):
 def generate_report(warm_up_lines):
     click.secho("\n\nGenerating Reports...", fg="green")
     extract_metrics(warm_up_lines=warm_up_lines)
-    generate_csv_output()
+    output = generate_csv_output()
     generate_latency_graph()
     generate_profile_graph()
     click.secho("\nTest suite execution complete.", fg="green")
+    return output
 
 
 metrics = {
@@ -813,5 +814,40 @@ def setup(model, image, filename):
     download_input(image, filename)
 
 
+def update_config(cores):
+    file_path = "config.properties"
+    os.system(f'sed -i "$ d" {file_path}')
+    os.system(
+        f"echo cpu_launcher_args=--ninstances 1 --ncore_per_instance {cores} --node_id 0 >> {file_path}")
+
+
 if __name__ == "__main__":
-    benchmark()
+    args = sys.argv[1:]
+    if not args or args[0] != "custom":
+        benchmark()
+    else:
+        filename = "result.csv"
+        file = open(filename, "a+")
+        writer = csv.writer(file, delimiter=",")
+        writer.writerow(["model", "cores", "batch_size", "instances",
+                         "throughput", "mean_ts_latency", "mean_predict_latency"])
+
+        core_count = 16
+        for b in range(0, 10):
+            for cores in range(1, core_count + 1):
+                batch_size = 2 ** b
+
+                execution_params["batch_size"] = batch_size
+                execution_params["batch_delay"] = 100 * batch_size
+                execution_params["concurrency"] = batch_size
+                execution_params["requests"] = batch_size * \
+                    20 if cores < 4 else batch_size * 40
+                update_config(cores)
+
+                output = benchmark(standalone_mode=False)
+                model = execution_params["url"]
+                model = model[:model.index(".")]
+                writer.writerow([model, cores, output["Batch size"], output["Workers"],
+                                 output["TS throughput"], output["TS latency mean"], output["predict_mean"]])
+                file.flush()
+        file.close()
