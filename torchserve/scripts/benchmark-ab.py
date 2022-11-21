@@ -798,10 +798,17 @@ def move_mar_file(model):
 
 def download_input(image, filename):
     import urllib
+    from PIL import Image
+
     try:
         urllib.request.urlretrieve(image, filename)
     except urllib.error.HTTPError:
         urllib.request.urlretrieve(image, filename)
+
+    img = Image.open(filename)
+    img = img.resize((256, 256))
+    img = img.crop((16, 16, 240, 240))
+    img.save(filename)
 
 
 def setup(model, image, filename):
