@@ -805,6 +805,7 @@ def download_input(image, filename):
     except urllib.error.HTTPError:
         urllib.request.urlretrieve(image, filename)
 
+    # TODO: Add to the vision_handler; if removed from here.
     img = Image.open(filename)
     img = img.resize((256, 256))
     img = img.crop((16, 16, 240, 240))
