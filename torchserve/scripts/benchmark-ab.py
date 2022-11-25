@@ -280,7 +280,8 @@ def unregister_model():
             execution_params["management_url"] + "/workflows/benchmark"
         )
     else:
-        resp = requests.delete(execution_params["management_url"] + "/models/benchmark")
+        resp = requests.delete(
+            execution_params["management_url"] + "/models/benchmark")
     if not resp.status_code == 200:
         failure_exit(f"Failed to unregister model. \n {resp.text}")
     click.secho(resp.text)
@@ -346,7 +347,8 @@ def docker_torchserve_start():
     click.secho("*Removing existing ts container instance...", fg="green")
     execute("docker rm -f ts", wait=True)
 
-    click.secho(f"*Starting docker container of image {docker_image} ...", fg="green")
+    click.secho(
+        f"*Starting docker container of image {docker_image} ...", fg="green")
     inference_port = urlparse(execution_params["inference_url"]).port
     management_port = urlparse(execution_params["management_url"]).port
     docker_run_cmd = (
@@ -369,7 +371,8 @@ def prepare_local_dependency():
     shutil.rmtree(
         os.path.join(execution_params["tmp_dir"], "wf_store/"), ignore_errors=True
     )
-    os.makedirs(os.path.join(execution_params["tmp_dir"], "wf_store/"), exist_ok=True)
+    os.makedirs(os.path.join(
+        execution_params["tmp_dir"], "wf_store/"), exist_ok=True)
     prepare_common_dependency()
 
 
@@ -476,8 +479,10 @@ def extract_metrics(warm_up_lines):
             if pattern.search(line):
                 all_lines.append(line.split("|")[0].split(":")[3].strip())
 
-        out_fname = os.path.join(*(execution_params["tmp_dir"], "benchmark", k))
-        click.secho(f"\nWriting extracted {v} metrics to {out_fname} ", fg="green")
+        out_fname = os.path.join(
+            *(execution_params["tmp_dir"], "benchmark", k))
+        click.secho(
+            f"\nWriting extracted {v} metrics to {out_fname} ", fg="green")
         with open(out_fname, "w") as outf:
             all_lines = map(lambda x: x + "\n", all_lines)
             outf.writelines(all_lines)
@@ -485,12 +490,14 @@ def extract_metrics(warm_up_lines):
 
 def generate_csv_output():
     click.secho("*Generating CSV output...", fg="green")
-    batched_requests = execution_params["requests"] / execution_params["batch_size"]
+    batched_requests = execution_params["requests"] / \
+        execution_params["batch_size"]
     line50 = int(batched_requests / 2)
     line90 = int(batched_requests * 9 / 10)
     line99 = int(batched_requests * 99 / 100)
 
-    click.secho(f"Saving benchmark results to {execution_params['report_location']}")
+    click.secho(
+        f"Saving benchmark results to {execution_params['report_location']}")
 
     artifacts = {}
     with open(execution_params["result_file"]) as f:
@@ -504,17 +511,21 @@ def generate_csv_output():
     artifacts["Concurrency"] = execution_params["concurrency"]
     artifacts["Input"] = "[input]({})".format(execution_params["input"])
     artifacts["Requests"] = execution_params["requests"]
-    artifacts["TS failed requests"] = extract_entity(data, "Failed requests:", -1)
-    artifacts["TS throughput"] = extract_entity(data, "Requests per second:", -3)
+    artifacts["TS failed requests"] = extract_entity(
+        data, "Failed requests:", -1)
+    artifacts["TS throughput"] = extract_entity(
+        data, "Requests per second:", -3)
     artifacts["TS latency P50"] = extract_entity(data, "50%", -1)
     artifacts["TS latency P90"] = extract_entity(data, "90%", -1)
     artifacts["TS latency P99"] = extract_entity(data, "99%", -1)
-    artifacts["TS latency mean"] = extract_entity(data, "Time per request:.*mean\)", -3)
+    artifacts["TS latency mean"] = extract_entity(
+        data, "Time per request:.*mean\)", -3)
     if isinstance(artifacts["TS failed requests"], type(None)):
         artifacts["TS error rate"] = 0.0
     else:
         artifacts["TS error rate"] = (
-            int(artifacts["TS failed requests"]) / execution_params["requests"] * 100
+            int(artifacts["TS failed requests"]) /
+            execution_params["requests"] * 100
         )
 
     with open(
@@ -535,10 +546,12 @@ def generate_csv_output():
         if df.empty:
             artifacts[m.split(".txt")[0] + "_mean"] = 0.0
         else:
-            artifacts[m.split(".txt")[0] + "_mean"] = df["data"].values.mean().round(2)
+            artifacts[m.split(".txt")[0] +
+                      "_mean"] = df["data"].values.mean().round(2)
 
     with open(
-        os.path.join(execution_params["report_location"], "benchmark", "ab_report.csv"),
+        os.path.join(
+            execution_params["report_location"], "benchmark", "ab_report.csv"),
         "w",
     ) as csv_file:
         csvwriter = csv.writer(csv_file)
@@ -571,7 +584,8 @@ def generate_latency_graph():
     plt.ylabel("Prediction time")
     plt.title("Prediction latency")
     plt.bar(iteration, latency)
-    plt.savefig(f"{execution_params['report_location']}/benchmark/predict_latency.png")
+    plt.savefig(
+        f"{execution_params['report_location']}/benchmark/predict_latency.png")
 
 
 def generate_profile_graph():
@@ -608,7 +622,7 @@ def generate_profile_graph():
         fig.set_xlabel("Percentage of queries")
         fig.grid()
         plot_points = np.arange(0, 100, 100 / len(data))
-        x = plot_points[: len(data) : sampling]
+        x = plot_points[: len(data): sampling]
         y = data[::sampling]
         fig.plot(x, y, f"tab:{color}")
 
