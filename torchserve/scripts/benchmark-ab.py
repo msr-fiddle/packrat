@@ -18,6 +18,7 @@ import pandas as pd
 import requests
 
 default_ab_params = {
+    "model": "resnet-18",
     "url": "https://torchserve.pytorch.org/mar_files/resnet-18.mar",
     "gpus": "",
     "exec_env": "local",
@@ -47,6 +48,12 @@ def json_provider(file_path, cmd_name):
 
 @click.command()
 @click.argument("test_plan", default="custom")
+@click.option(
+    "--model",
+    "-m",
+    default="resnet-50",
+    help="Input model name",
+)
 @click.option(
     "--url",
     "-u",
@@ -122,8 +129,9 @@ def json_provider(file_path, cmd_name):
 @click_config_file.configuration_option(
     provider=json_provider, implicit=False, help="Read configuration from a JSON file"
 )
-def benchmark(
+def start_benchmark(
     test_plan,
+    model,
     url,
     gpus,
     exec_env,
@@ -143,6 +151,7 @@ def benchmark(
     tmp_dir,
 ):
     input_params = {
+        "model": model,
         "url": url,
         "gpus": gpus,
         "exec_env": exec_env,
@@ -164,12 +173,11 @@ def benchmark(
 
     # set ab params
     click.secho(f"Running test plan: {test_plan}", fg="green")
-    shutil.rmtree(
-        os.path.join(execution_params["tmp_dir"], "model_store/"), ignore_errors=True
-    )
-    update_plan_params[test_plan]()
     update_exec_params(input_params)
+    update_plan_params[test_plan]()
 
+
+def benchmark():
     click.secho("Starting AB benchmark suite...", fg="green")
     click.secho("\n\nConfigured execution parameters are:", fg="green")
     click.secho(f"{execution_params}", fg="blue")
@@ -732,29 +740,6 @@ def workflow_nmt():
     pass
 
 
-def custom():
-    model = "resnet-50"
-    input = "https://github.com/pytorch/hub/raw/master/images/dog.jpg"
-    filename = "dog.jpg"
-    setup(model, input, filename)
-
-    # Update the execution parameters
-    execution_params["url"] = f"{model}.mar"
-    execution_params["input"] = f"{filename}"
-
-
-update_plan_params = {
-    "soak": soak,
-    "vgg11_1000r_10c": vgg11_1000r_10c,
-    "vgg11_10000r_100c": vgg11_10000r_100c,
-    "resnet152_batch": resnet152_batch,
-    "resnet152_batch_docker": resnet152_batch_docker,
-    "bert_batch": bert_batch,
-    "workflow_nmt": workflow_nmt,
-    "custom": custom,
-}
-
-
 def failure_exit(msg):
     click.secho(f"{msg}", fg="red")
     click.secho("Test suite terminated due to above failure", fg="red")
@@ -779,7 +764,7 @@ def create_torchscripted_model(model):
         resnet50 = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
         resnet50.eval()
 
-        example_input = torch.rand(1, 3, 224, 224)
+        example_input = torch.rand(execution_params["batch_size"], 3, 224, 224)
         traced_script_module = torch.jit.trace(resnet50, example_input)
         traced_script_module.save(f"{model}.pt")
     else:
@@ -810,20 +795,21 @@ def move_mar_file(model):
     shutil.move(mar_path, os.path.join(model_store, mar_file))
 
 
-def download_input(image, filename):
+def download_input(url, filename: str):
     import urllib
     from PIL import Image
 
     try:
-        urllib.request.urlretrieve(image, filename)
+        urllib.request.urlretrieve(url, filename)
     except urllib.error.HTTPError:
-        urllib.request.urlretrieve(image, filename)
+        urllib.request.urlretrieve(url, filename)
 
-    # TODO: Add to the vision_handler; if removed from here.
-    img = Image.open(filename)
-    img = img.resize((256, 256))
-    img = img.crop((16, 16, 240, 240))
-    img.save(filename)
+    if filename.__contains__("jpg"):
+        # TODO: Add to the vision_handler; if removed from here.
+        img = Image.open(filename)
+        img = img.resize((256, 256))
+        img = img.crop((16, 16, 240, 240))
+        img.save(filename)
 
 
 def setup(model, image, filename):
@@ -836,40 +822,73 @@ def setup(model, image, filename):
     download_input(image, filename)
 
 
+def handle_model_specific_inputs():
+    # Clean the model store
+    shutil.rmtree(
+        os.path.join(execution_params["tmp_dir"], "model_store/"), ignore_errors=True
+    )
+    model = execution_params["model"]
+    if model == "resnet-50":
+        input = "https://github.com/pytorch/hub/raw/master/images/dog.jpg"
+        filename = "dog.jpg"
+        setup(model, input, filename)
+
+        # Update the execution parameters
+        execution_params["url"] = f"{model}.mar"
+        execution_params["input"] = f"{filename}"
+    elif model == "bert":
+        execution_params["url"] = "https://torchserve.pytorch.org/mar_files/BERTSeqClassification_torchscript.mar"
+        execution_params["input"] = "./serve/examples/Huggingface_Transformers/Seq_classification_artifacts/sample_text.txt"
+    else:
+        raise Exception("Model is not handled yet!")
+
+
 def update_config(cores):
     file_path = "config.properties"
+    workers = execution_params["workers"]
     os.system(f'sed -i "$ d" {file_path}')
     os.system(
-        f"echo cpu_launcher_args=--ninstances 1 --ncore_per_instance {cores} --node_id 0 >> {file_path}")
+        f"echo cpu_launcher_args=--ninstances {workers} --ncore_per_instance {cores} --node_id 0 >> {file_path}")
 
+
+def custom():
+    model = execution_params["model"]
+    output_file = f"{model}_results.csv"
+    file = open(output_file, "a+")
+    writer = csv.writer(file, delimiter=",")
+    writer.writerow(["model", "cores", "batch_size", "instances",
+                     "throughput", "mean_ts_latency", "mean_predict_latency"])
+
+    core_count = 16
+    for b in range(0, 10):
+        for cores in range(1, core_count + 1):
+            batch_size = 2 ** b
+
+            execution_params["batch_size"] = batch_size
+            execution_params["batch_delay"] = 100 * batch_size
+            execution_params["concurrency"] = batch_size
+            execution_params["requests"] = batch_size * \
+                20 if cores < 4 else batch_size * 40
+
+            update_config(cores)
+            handle_model_specific_inputs()
+            output = benchmark()
+            writer.writerow([model, cores, output["Batch size"], output["Workers"],
+                             output["TS throughput"], output["TS latency mean"], output["predict_mean"]])
+            file.flush()
+    file.close()
+
+
+update_plan_params = {
+    "soak": soak,
+    "vgg11_1000r_10c": vgg11_1000r_10c,
+    "vgg11_10000r_100c": vgg11_10000r_100c,
+    "resnet152_batch": resnet152_batch,
+    "resnet152_batch_docker": resnet152_batch_docker,
+    "bert_batch": bert_batch,
+    "workflow_nmt": workflow_nmt,
+    "custom": custom,
+}
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    if not args or args[0] != "custom":
-        benchmark()
-    else:
-        filename = "result.csv"
-        file = open(filename, "a+")
-        writer = csv.writer(file, delimiter=",")
-        writer.writerow(["model", "cores", "batch_size", "instances",
-                         "throughput", "mean_ts_latency", "mean_predict_latency"])
-
-        core_count = 16
-        for b in range(0, 10):
-            for cores in range(1, core_count + 1):
-                batch_size = 2 ** b
-
-                execution_params["batch_size"] = batch_size
-                execution_params["batch_delay"] = 100 * batch_size
-                execution_params["concurrency"] = batch_size
-                execution_params["requests"] = batch_size * \
-                    20 if cores < 4 else batch_size * 40
-                update_config(cores)
-
-                output = benchmark(standalone_mode=False)
-                model = execution_params["url"]
-                model = model[:model.index(".")]
-                writer.writerow([model, cores, output["Batch size"], output["Workers"],
-                                 output["TS throughput"], output["TS latency mean"], output["predict_mean"]])
-                file.flush()
-        file.close()
+    start_benchmark()
