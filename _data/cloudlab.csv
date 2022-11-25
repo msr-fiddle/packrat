@@ -2,4 +2,4 @@ date,revision,path,resnetbench,inceptionbench,gptbench,bertbench
 2022-08-22,large-batches,,index.html,index.html,index.html,index.html
 2022-09-29,large-batches-tcmalloc,,index.html,,,
 2022-11-21,torchserve,,index.html,,,
-2022-11-21,torchserve-opt,,index.html,,,
+2022-11-21,torchserve-opt,,index.html,,,index.html
