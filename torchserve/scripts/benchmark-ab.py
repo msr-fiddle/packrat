@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 from subprocess import PIPE, Popen
+from enum import Enum
 from urllib.parse import urlparse
 
 import click
@@ -19,6 +20,7 @@ import requests
 
 default_ab_params = {
     "model": "resnet-18",
+    "allocator": "tcmalloc",
     "url": "https://torchserve.pytorch.org/mar_files/resnet-18.mar",
     "gpus": "",
     "exec_env": "local",
@@ -46,13 +48,41 @@ def json_provider(file_path, cmd_name):
         return json.load(config_data)
 
 
+class Models(Enum):
+    resnet50 = 1
+    inception = 2
+    bert = 3
+    gpt2 = 4
+    mobilenet = 5
+    squeezenet = 6
+
+
+transformer_setting = {
+    "model_name": "gpt2",
+    "mode": "text_generation",
+    "do_lower_case": True,
+    "num_labels": 0,
+    "save_mode": "torchscript",
+    "max_length": 150,
+    "captum_explanation": False,
+    "embedding_name": "gpt2",
+    "FasterTransformer": True
+}
+
+
 @click.command()
 @click.argument("test_plan", default="custom")
 @click.option(
     "--model",
     "-m",
-    default="resnet-50",
-    help="Input model name",
+    default=Models.resnet50.name,
+    help=f"Input model name {[model.name for model in Models]}",
+)
+@click.option(
+    "--allocator",
+    "-a",
+    default="tcmalloc",
+    help="Pick the allocator from [default, tcmalloc]"
 )
 @click.option(
     "--url",
@@ -132,6 +162,7 @@ def json_provider(file_path, cmd_name):
 def start_benchmark(
     test_plan,
     model,
+    allocator,
     url,
     gpus,
     exec_env,
@@ -152,6 +183,7 @@ def start_benchmark(
 ):
     input_params = {
         "model": model,
+        "allocator": allocator,
         "url": url,
         "gpus": gpus,
         "exec_env": exec_env,
@@ -219,7 +251,11 @@ def warm_up():
     register_model()
 
     if is_workflow(execution_params["url"]):
-        execution_params["inference_model_url"] = "wfpredict/benchmark"
+        execution_params["inference_model_url"] = "wfpredict/{}".format(
+            execution_params["model"])
+    else:
+        execution_params["inference_model_url"] = "predictions/{}".format(
+            execution_params["model"])
 
     click.secho("\n\nExecuting warm-up ...", fg="green")
 
@@ -238,7 +274,11 @@ def warm_up():
 
 def run_benchmark():
     if is_workflow(execution_params["url"]):
-        execution_params["inference_model_url"] = "wfpredict/benchmark"
+        execution_params["inference_model_url"] = "wfpredict/{}".format(
+            execution_params["model"])
+    else:
+        execution_params["inference_model_url"] = "predictions/{}".format(
+            execution_params["model"])
 
     click.secho("\n\nExecuting inference performance tests ...", fg="green")
     ab_cmd = (
@@ -258,7 +298,7 @@ def register_model():
     if is_workflow(execution_params["url"]):
         url = execution_params["management_url"] + "/workflows"
         data = {
-            "workflow_name": "benchmark",
+            "workflow_name": execution_params["model"],
             "url": execution_params["url"],
             "batch_delay": execution_params["batch_delay"],
             "batch_size": execution_params["batch_size"],
@@ -268,7 +308,7 @@ def register_model():
     else:
         url = execution_params["management_url"] + "/models"
         data = {
-            "model_name": "benchmark",
+            "model_name": execution_params["model"],
             "url": execution_params["url"],
             "batch_delay": execution_params["batch_delay"],
             "batch_size": execution_params["batch_size"],
@@ -285,11 +325,12 @@ def unregister_model():
     click.secho("*Unregistering model ...", fg="green")
     if is_workflow(execution_params["url"]):
         resp = requests.delete(
-            execution_params["management_url"] + "/workflows/benchmark"
+            execution_params["management_url"] +
+            "/workflows/" + execution_params["model"]
         )
     else:
         resp = requests.delete(
-            execution_params["management_url"] + "/models/benchmark")
+            execution_params["management_url"] + "/models/" + execution_params["model"])
     if not resp.status_code == 200:
         failure_exit(f"Failed to unregister model. \n {resp.text}")
     click.secho(resp.text)
@@ -760,15 +801,23 @@ def create_torchscripted_model(model):
     import torch
     from torchvision import models
 
-    if model == "resnet-50":
-        resnet50 = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-        resnet50.eval()
-
-        example_input = torch.rand(execution_params["batch_size"], 3, 224, 224)
-        traced_script_module = torch.jit.trace(resnet50, example_input)
-        traced_script_module.save(f"{model}.pt")
+    if model == Models.resnet50.name:
+        eager_model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        eager_model.eval()
+    elif model == Models.mobilenet.name:
+        eager_model = models.mobilenet_v2(
+            weights=models.MobileNet_V2_Weights.DEFAULT)
+        eager_model.eval()
+    elif model == Models.inception.name:
+        eager_model = models.inception_v3(
+            weights=models.Inception_V3_Weights.DEFAULT)
+        eager_model.eval()
     else:
         raise Exception(f"Unknown model: {model}")
+
+    example_input = torch.rand(execution_params["batch_size"], 3, 224, 224)
+    traced_script_module = torch.jit.trace(eager_model, example_input)
+    traced_script_module.save(f"{model}.pt")
 
 
 def create_mar(model):
@@ -822,13 +871,43 @@ def setup(model, image, filename):
     download_input(image, filename)
 
 
+def create_gpt2():
+    import json
+
+    model = Models.gpt2.name
+    path = "./serve/examples/Huggingface_Transformers/setup_config.json"
+    with open(path, 'w') as file:
+        json_data = json.dumps(transformer_setting, indent=1)
+        file.write(json_data)
+        file.close()
+
+        download = [
+            "python",
+            "./serve/examples/Huggingface_Transformers/Download_Transformer_models.py setup_config.json"
+        ]
+        os.system(" ".join(download))
+        exit()
+
+    cmd = [
+        "torch-model-archiver",
+        f"--model-name {model}",
+        "--version 1.0",
+        "--serialized-file ./Transformer_model/traced_model.pt",
+        "--handler ./Transformer_handler_generalized.py",
+        "--extra-files \"./setup_config.json,Transformer_model/config.json\"",
+    ]
+    os.system(" ".join(cmd))
+    os.remove(Path(os.getcwd()).joinpath(model + ".pt"))
+    move_mar_file(model)
+
+
 def handle_model_specific_inputs():
     # Clean the model store
     shutil.rmtree(
         os.path.join(execution_params["tmp_dir"], "model_store/"), ignore_errors=True
     )
     model = execution_params["model"]
-    if model == "resnet-50":
+    if model in [Models.resnet50.name, Models.mobilenet.name, Models.inception.name]:
         input = "https://github.com/pytorch/hub/raw/master/images/dog.jpg"
         filename = "dog.jpg"
         setup(model, input, filename)
@@ -836,9 +915,16 @@ def handle_model_specific_inputs():
         # Update the execution parameters
         execution_params["url"] = f"{model}.mar"
         execution_params["input"] = f"{filename}"
-    elif model == "bert":
+    elif model == Models.bert.name:
         execution_params["url"] = "https://torchserve.pytorch.org/mar_files/BERTSeqClassification_torchscript.mar"
-        execution_params["input"] = "./serve/examples/Huggingface_Transformers/Seq_classification_artifacts/sample_text.txt"
+        execution_params["input"] = ".testdata/sample_text.txt"
+    elif model == Models.squeezenet.name:
+        download_input(
+            "https://raw.githubusercontent.com/pytorch/serve/master/examples/image_classifier/kitten.jpg", "kitten.jpg")
+        execution_params["input"] = "kitten.jpg"
+        execution_params["url"] = "https://torchserve.pytorch.org/mar_files/squeezenet1_1_scripted.mar"
+    elif model == Models.gpt2.name:
+        create_gpt2()
     else:
         raise Exception("Model is not handled yet!")
 
@@ -846,17 +932,29 @@ def handle_model_specific_inputs():
 def update_config(cores):
     file_path = "config.properties"
     workers = execution_params["workers"]
+    allocator = execution_params["allocator"]
     os.system(f'sed -i "$ d" {file_path}')
+
+    use_multiinstance = ''
+    use_allocator = ''
+    if workers > 1:
+        use_multiinstance = "--multi_instance"
+    if allocator == "default":
+        use_allocator = "--use_default_allocator"
+    elif allocator == "tcmalloc":
+        use_allocator = "--enable_tcmalloc"
+
     os.system(
-        f"echo cpu_launcher_args=--ninstances {workers} --ncore_per_instance {cores} --node_id 0 >> {file_path}")
+        f"echo cpu_launcher_args={use_multiinstance} {use_allocator} --ninstances {workers} --ncore_per_instance {cores} --node_id 0 >> {file_path}")
 
 
 def custom():
     model = execution_params["model"]
+    allocator = execution_params["allocator"]
     output_file = f"{model}_results.csv"
     file = open(output_file, "a+")
     writer = csv.writer(file, delimiter=",")
-    writer.writerow(["model", "cores", "batch_size", "instances",
+    writer.writerow(["model", "cores", "batch_size", "instances", "allocator",
                      "throughput", "mean_ts_latency", "mean_predict_latency"])
 
     core_count = 16
@@ -873,7 +971,7 @@ def custom():
             update_config(cores)
             handle_model_specific_inputs()
             output = benchmark()
-            writer.writerow([model, cores, output["Batch size"], output["Workers"],
+            writer.writerow([model, cores, output["Batch size"], output["Workers"], allocator,
                              output["TS throughput"], output["TS latency mean"], output["predict_mean"]])
             file.flush()
     file.close()
