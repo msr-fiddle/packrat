@@ -1,13 +1,4 @@
 benchmark,topology,pinning,source,allocator,instance_id,interop_threads,intraop_threads,batch_size,throughput
-inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,1,1,9.661987777135112
-inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,2,1,16.265519411088135
-inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,3,1,22.42506689405292
-inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,4,1,27.704815821615274
-inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,5,1,31.910012793888242
-inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,6,1,36.103580657344715
-inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,7,1,38.467919194489255
-inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,8,1,41.24224082442154
-inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,9,1,40.797442193921455
 inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,1,1,13.311747714974878
 inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,2,1,23.7657501778834
 inception_manual_script,sequential,numactl,torch,tcmalloc,1,1,3,1,33.16005448483799
