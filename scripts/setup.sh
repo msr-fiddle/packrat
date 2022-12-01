@@ -15,10 +15,10 @@ fi
 APPEND="--yes --no-install-recommends"
 
 install_torchserve() {
-    $APT install apache2-utils
-    $APT install libgit2-dev
+    $APT install apache2-utils $APPEND
+    $APT install libgit2-dev $APPEND
 
-    pip install pygit2
+    pip install pygit2==1.6.1
     pip install click
     pip install click_config_file
     pip install captum
@@ -29,9 +29,10 @@ install_torchserve() {
     python ts_scripts/install_dependencies.py
     python ts_scripts/install_from_src.py
 
-    $APT install libjpeg-dev
+    $APT install libjpeg-dev $APPEND
     $SUDO pip install --prefix=/opt/intel/ipp ipp-devel
     pip install git+https://github.com/pytorch/accimage
+    echo "Add install director to the PATH".
 }
 
 install_vtune() {
@@ -110,6 +111,12 @@ config_cloudlab_box() {
   git config --global user.name "Ankit Bhardwaj"
   git config --global user.email "bhrdwj.ankit@gmail.com"
   git config core.editor vim
+
+  if ! command -v geni-get &> /dev/null
+  then
+    echo "## Error: Not on a Cloudlab machine, skipping rootfs growing."
+    exit 1
+  fi
 
   size=$(df -h --output=size / | awk 'NR==2{print $1}')
   if [ $size != "50G" ]; then

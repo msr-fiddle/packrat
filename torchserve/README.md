@@ -69,7 +69,16 @@ torchserve --stop
 [**Batch Inference with TorchServe**](https://github.com/ankit-iitb/serve/blob/release_0.6.1/docs/batch_inference_with_ts.md)
 
 ## Benchmarking
-TODO
+
+```python
+python scripts/benchmark-ab.py --model resnet50 --allocator default
+```
+
+Change model and allocator based on the requirements. To check all the available options, run:
+
+```python
+python scripts/benchmark-ab.py --help
+```
 
 ## Run TorchServe with the launcher
 To run the TorchServe with the IPEX launcher add the configuration flags to the

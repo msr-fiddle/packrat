@@ -153,8 +153,10 @@ class Optimizer:
 
 
 if __name__ == "__main__":
-    optimizer = Optimizer(model="resnet", allocator="default",
+    model = "resnet"
+    optimizer = Optimizer(model=model, allocator="default",
                           optimization="script", profile_tag="large-batches")
-    instances = []
-    optimizer.solution(16, 1024, "resnet", instances)
-    print(instances)
+    for i in range(0, 11):
+        instances = []
+        optimizer.solution(16, 2**i, model, instances)
+        print(2**i, instances)
