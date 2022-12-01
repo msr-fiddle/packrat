@@ -17,7 +17,7 @@ import pickle
 import pandas as pd
 
 
-def get_data(model: str, benchmark: str):
+def get_data(model: str, benchmark: str, profile_tag: str):
     """
     Get the data from the benchmark.
     :param model: model name
@@ -25,8 +25,7 @@ def get_data(model: str, benchmark: str):
     :return: dataframe
     """
     base = "https://msr-fiddle.github.io/naf"
-    url = f"{base}/{model}/skylake2x/large-batches/{model}_{benchmark}.csv"
-    print(url)
+    url = f"{base}/{model}/cloudlab/{profile_tag}/{model}_{benchmark}.csv"
     print(f" > Fetching {url} ...", end='')
     try:
         with urllib.request.urlopen(url) as response:
@@ -38,14 +37,21 @@ def get_data(model: str, benchmark: str):
         return None
 
 
-def format_data(data):
+def format_data(data, allocator, optimization):
     """
     Format the data into a matrix.
     :param data: dataframe
     :return: matrix
     """
-    data = data.loc[:, ["topology", "intraop_threads",
-                        "batch_size", "latency(avg)"]]
+    filter_list = ["topology", "intraop_threads", "batch_size", "latency(avg)"]
+    if allocator != None:
+        data = data.loc[data["allocator"] == allocator]
+        filter_list.append("allocator")
+    if optimization != None:
+        data = data.loc[data["benchmark"].str.contains(optimization)]
+        filter_list.append("benchmark")
+
+    data = data.loc[:, filter_list]
 
     latencies = {}
     for thread in data.intraop_threads.unique():
@@ -66,21 +72,32 @@ class Optimizer:
     Configuration optimizer for the benchmark.
     """
 
-    def __init__(self):
+    def __init__(self, model, allocator, optimization, profile_tag, preprocessed=False):
         """Initialize the optimizer."""
+        self.workloads = []
         self.opt = {}
         self.latencies = {}
-        self.workloads = ["resnet", "inception", "gpt2", "bert"]
-        for workload in self.workloads:
-            self.latencies[workload] = format_data(
-                get_data(workload, "latency"))
-            try:
-                with open(f'utils/{workload}.pickle', 'rb') as file:
-                    self.opt[workload] = pickle.load(file)
-            except FileNotFoundError:
-                self.opt[workload] = self.min_latency(workload)
-                with open(f'{workload}.pickle', 'wb') as file:
-                    pickle.dump(self.opt[workload], file)
+
+        self.add_model(model, allocator, optimization,
+                       profile_tag, preprocessed)
+
+    def add_model(self, model, allocator, optimization, profile_tag, preprocessed):
+        """Add a new model to the optimizer."""
+        self.workloads.append(model)
+        self.latencies[model] = format_data(
+            get_data(model, "latency", profile_tag), allocator, optimization)
+        try:
+            if not preprocessed:
+                raise FileNotFoundError
+            with open(f'utils/{model}.pickle', 'rb') as file:
+                print(f" > Loading {model} from pickle file ...", end='\n')
+                self.opt[model] = pickle.load(file)
+        except FileNotFoundError:
+            self.opt[model] = self.min_latency(model)
+            if preprocessed:
+                with open(f'utils/{model}.pickle', 'wb') as file:
+                    print(f" > Saving {model} to pickle file ...", end='\n')
+                    pickle.dump(self.opt[model], file)
 
     def min_latency(self, workload):
         """
@@ -115,6 +132,8 @@ class Optimizer:
 
     def solution(self, threads, batch, workload, result):
         if threads <= 0 or batch <= 0:
+            if sum([r[0] for r in result]) > max(self.latencies[workload].keys()):
+                raise Exception("Too many threads")
             return 0
 
         latency = self.latencies[workload]
@@ -133,7 +152,8 @@ class Optimizer:
 
 
 if __name__ == "__main__":
-    optimizer = Optimizer()
+    optimizer = Optimizer(model="resnet", allocator="default",
+                          optimization="script", profile_tag="large-batches")
     instances = []
-    optimizer.solution(18, 1024, "resnet", instances)
+    optimizer.solution(16, 1024, "resnet", instances)
     print(instances)
