@@ -22,8 +22,10 @@ title:  "Bert"
 
 ## Latency Per Optimization
 <p float="left">
+<img src="./bert-latency-none.png" alt="Bert Latency Opt=None" width="100%"/>
 <img src="./bert-latency-script.png" alt="Bert Latency Opt=Script" width="100%"/>
 </p>
+
 
 # Throughput (Sequential)
 ## Throughput Per Batch
@@ -43,6 +45,7 @@ title:  "Bert"
 
 ## Throughput Per Optimization
 <p float="left">
+<img src="./bert-throughput-none.png" alt="Bert Latency Opt=None" width="100%"/>
 <img src="./bert-throughput-script.png" alt="Bert Latency Opt=Script" width="100%"/>
 </p>
 
