@@ -22,6 +22,7 @@ title:  "Inception"
 
 ## Latency Per Optimization
 <p float="left">
+<img src="./inception-latency-none.png" alt="Inception Latency Opt=None" width="100%"/>
 <img src="./inception-latency-script.png" alt="Inception Latency Opt=Script" width="100%"/>
 </p>
 
@@ -43,6 +44,7 @@ title:  "Inception"
 
 ## Throughput Per Optimization
 <p float="left">
+<img src="./inception-throughput-none.png" alt="Inception Latency Opt=None" width="100%"/>
 <img src="./inception-throughput-script.png" alt="Inception Latency Opt=Script" width="100%"/>
 </p>
 
