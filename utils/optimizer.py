@@ -74,6 +74,7 @@ class Optimizer:
 
     def __init__(self, model, allocator, optimization, profile_tag, preprocessed=False):
         """Initialize the optimizer."""
+        print(f"Optimize {model} with {allocator} allocator and Optimization={optimization}")
         self.workloads = []
         self.opt = {}
         self.latencies = {}

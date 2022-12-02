@@ -113,7 +113,7 @@ def set_memory_allocator(env, allocator: MemoryAllocator):
     elif allocator == MemoryAllocator.tcmalloc and tcmalloc_lib.exists():
         env["LD_PRELOAD"] = tcmalloc_lib.as_posix()
     elif allocator == MemoryAllocator.jemalloc and jemalloc_lib.exists():
-        env["MALLOC_CONF"]="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
+        env["MALLOC_CONF"] = "oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
         env["LD_PRELOAD"] = jemalloc_lib.as_posix()
     else:
         raise Exception("Unable to set memory allocator")
@@ -231,7 +231,8 @@ if __name__ == '__main__':
     else:
         logging.debug("Running multiple instances")
         core_count = lower_power_of_two(core_count)
-        optimizer = Optimizer()
+        optimizer = Optimizer(model=arguments.benchmark, allocator=arguments.allocator,
+                              optimization=arguments.optimization, profile_tag="large-batches")
 
         for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
             # ====================== 1 instance ======================
@@ -251,9 +252,24 @@ if __name__ == '__main__':
             optimal_instances = []
             optimizer.solution(core_count, batch_size,
                                arguments.benchmark, optimal_instances)
+            logging.info(
+                f"<{core_count}, {batch_size}> is converted to {optimal_instances}")
             total_instances = len(optimal_instances)
             instances, cmd, config = [], [], []
             starting_core = 0
+
+            # Expected latency
+            if True:
+                instance0_cores = optimal_instances[0][0]
+                instance0_batch = optimal_instances[0][1]
+
+                instance0_config = Config(arguments)
+                instance0_config = update_config(instance0_config, 0, arguments.mapping, instance0_batch,
+                                                 instance0_cores, proclist[starting_core:starting_core + instance0_cores])
+                p0 = Process(
+                    target=run_single_instance, args=(instance0_config,))
+                p0.start()
+                p0.join()
 
             for i in range(total_instances):
                 cores_per_instance = optimal_instances[i][0]

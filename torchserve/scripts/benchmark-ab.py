@@ -917,7 +917,7 @@ def handle_model_specific_inputs():
         execution_params["input"] = f"{filename}"
     elif model == Models.bert.name:
         execution_params["url"] = "https://torchserve.pytorch.org/mar_files/BERTSeqClassification_torchscript.mar"
-        execution_params["input"] = ".testdata/sample_text.txt"
+        execution_params["input"] = "./serve/examples/Huggingface_Transformers/Seq_classification_artifacts/sample_text.txt"
     elif model == Models.squeezenet.name:
         download_input(
             "https://raw.githubusercontent.com/pytorch/serve/master/examples/image_classifier/kitten.jpg", "kitten.jpg")
@@ -954,24 +954,25 @@ def custom():
     output_file = f"{model}_results.csv"
     file = open(output_file, "a+")
     writer = csv.writer(file, delimiter=",")
-    writer.writerow(["model", "cores", "batch_size", "instances", "allocator",
+    writer.writerow(["model", "instances", "cores", "batch_size", "allocator",
                      "throughput", "mean_ts_latency", "mean_predict_latency"])
 
     core_count = 16
-    for b in range(0, 10):
+    workers = 1
+    for b in range(0, 8):
         for cores in range(1, core_count + 1):
             batch_size = 2 ** b
 
+            execution_params["workers"] = workers
             execution_params["batch_size"] = batch_size
             execution_params["batch_delay"] = 100 * batch_size
-            execution_params["concurrency"] = batch_size
-            execution_params["requests"] = batch_size * \
-                20 if cores < 4 else batch_size * 40
+            execution_params["concurrency"] = workers * batch_size
+            execution_params["requests"] = execution_params["concurrency"] * 100
 
             update_config(cores)
             handle_model_specific_inputs()
             output = benchmark()
-            writer.writerow([model, cores, output["Batch size"], output["Workers"], allocator,
+            writer.writerow([model, workers, cores, output["Batch size"], allocator,
                              output["TS throughput"], output["TS latency mean"], output["predict_mean"]])
             file.flush()
     file.close()
