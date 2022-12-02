@@ -22,6 +22,7 @@ title:  "GPT-2"
 
 ## Latency Per Optimization
 <p float="left">
+<img src="./gpt2-latency-none.png" alt="GPT-2 Latency Opt=None" width="100%"/>
 <img src="./gpt2-latency-script.png" alt="GPT-2 Latency Opt=Script" width="100%"/>
 </p>
 
@@ -43,6 +44,7 @@ title:  "GPT-2"
 
 ## Throughput Per Optimization
 <p float="left">
+<img src="./gpt2-throughput-none.png" alt="GPT-2 Latency Opt=None" width="100%"/>
 <img src="./gpt2-throughput-script.png" alt="GPT-2 Latency Opt=Script" width="100%"/>
 </p>
 
