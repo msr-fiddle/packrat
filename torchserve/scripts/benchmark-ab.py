@@ -17,10 +17,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
+import fcntl
 
 default_ab_params = {
     "model": "resnet-18",
     "allocator": "tcmalloc",
+    "multiinstance": False,
     "url": "https://torchserve.pytorch.org/mar_files/resnet-18.mar",
     "gpus": "",
     "exec_env": "local",
@@ -66,7 +68,8 @@ transformer_setting = {
     "max_length": 150,
     "captum_explanation": False,
     "embedding_name": "gpt2",
-    "FasterTransformer": True
+    "FasterTransformer": False,
+    "model_parallel": False,
 }
 
 
@@ -83,6 +86,12 @@ transformer_setting = {
     "-a",
     default="tcmalloc",
     help="Pick the allocator from [default, tcmalloc]"
+)
+@click.option(
+    "--multiinstance",
+    "-m",
+    default=False,
+    help="Enable to run torchserve with multi-instances"
 )
 @click.option(
     "--url",
@@ -163,6 +172,7 @@ def start_benchmark(
     test_plan,
     model,
     allocator,
+    multiinstance,
     url,
     gpus,
     exec_env,
@@ -184,6 +194,7 @@ def start_benchmark(
     input_params = {
         "model": model,
         "allocator": allocator,
+        "multiinstance": multiinstance,
         "url": url,
         "gpus": gpus,
         "exec_env": exec_env,
@@ -260,7 +271,7 @@ def warm_up():
     click.secho("\n\nExecuting warm-up ...", fg="green")
 
     ab_cmd = (
-        f"ab -c {execution_params['concurrency']}  -n {execution_params['requests']/10} -k -p "
+        f"ab -s 120 -c {execution_params['concurrency']}  -n {execution_params['requests']/10} -k -p "
         f"{execution_params['tmp_dir']}/benchmark/input -T  {execution_params['content_type']} "
         f"{execution_params['inference_url']}/{execution_params['inference_model_url']} > "
         f"{execution_params['result_file']}"
@@ -282,7 +293,7 @@ def run_benchmark():
 
     click.secho("\n\nExecuting inference performance tests ...", fg="green")
     ab_cmd = (
-        f"ab -c {execution_params['concurrency']}  -n {execution_params['requests']} -k -p "
+        f"ab -s 120 -c {execution_params['concurrency']}  -n {execution_params['requests']} -k -p "
         f"{execution_params['tmp_dir']}/benchmark/input -T  {execution_params['content_type']} "
         f"{execution_params['inference_url']}/{execution_params['inference_model_url']} > "
         f"{execution_params['result_file']}"
@@ -886,18 +897,16 @@ def create_gpt2():
             "./serve/examples/Huggingface_Transformers/Download_Transformer_models.py setup_config.json"
         ]
         os.system(" ".join(download))
-        exit()
 
     cmd = [
         "torch-model-archiver",
         f"--model-name {model}",
         "--version 1.0",
         "--serialized-file ./Transformer_model/traced_model.pt",
-        "--handler ./Transformer_handler_generalized.py",
-        "--extra-files \"./setup_config.json,Transformer_model/config.json\"",
+        "--handler ./serve/examples/Huggingface_Transformers/Transformer_handler_generalized.py",
+        "--extra-files \"./serve/examples/Huggingface_Transformers/setup_config.json\""
     ]
     os.system(" ".join(cmd))
-    os.remove(Path(os.getcwd()).joinpath(model + ".pt"))
     move_mar_file(model)
 
 
@@ -925,6 +934,8 @@ def handle_model_specific_inputs():
         execution_params["url"] = "https://torchserve.pytorch.org/mar_files/squeezenet1_1_scripted.mar"
     elif model == Models.gpt2.name:
         create_gpt2()
+        execution_params["url"] = f"{model}.mar"
+        execution_params["input"] = "./serve/examples/Huggingface_Transformers/Text_gen_artifacts/sample_text.txt"
     else:
         raise Exception("Model is not handled yet!")
 
@@ -948,34 +959,87 @@ def update_config(cores):
         f"echo cpu_launcher_args={use_multiinstance} {use_allocator} --ninstances {workers} --ncore_per_instance {cores} --node_id 0 >> {file_path}")
 
 
-def custom():
+def run_singe_instance(workers: int, cores: int, batch_size: int):
+    print(workers, cores, batch_size)
     model = execution_params["model"]
     allocator = execution_params["allocator"]
     output_file = f"{model}_results.csv"
+    exists: bool = os.path.isfile(output_file)
     file = open(output_file, "a+")
     writer = csv.writer(file, delimiter=",")
-    writer.writerow(["model", "instances", "cores", "batch_size", "allocator",
-                     "throughput", "mean_ts_latency", "mean_predict_latency"])
+    if not exists:
+        writer.writerow(["model", "instances", "cores", "batch_size", "allocator",
+                         "throughput", "mean_ts_latency", "mean_predict_latency"])
 
-    core_count = 16
-    workers = 1
-    for b in range(0, 8):
-        for cores in range(1, core_count + 1):
-            batch_size = 2 ** b
+    execution_params["batch_size"] = batch_size
+    execution_params["workers"] = workers
+    execution_params["batch_delay"] = 100 * \
+        execution_params["batch_size"]
+    execution_params["concurrency"] = execution_params["workers"] * \
+        execution_params["batch_size"]
+    execution_params["requests"] = execution_params["concurrency"] * 100
 
-            execution_params["workers"] = workers
-            execution_params["batch_size"] = batch_size
-            execution_params["batch_delay"] = 100 * batch_size
-            execution_params["concurrency"] = workers * batch_size
-            execution_params["requests"] = execution_params["concurrency"] * 100
-
-            update_config(cores)
-            handle_model_specific_inputs()
-            output = benchmark()
-            writer.writerow([model, workers, cores, output["Batch size"], allocator,
-                             output["TS throughput"], output["TS latency mean"], output["predict_mean"]])
-            file.flush()
+    update_config(cores)
+    handle_model_specific_inputs()
+    output = benchmark()
+    fcntl.flock(file, fcntl.LOCK_EX)
+    writer.writerow([model, workers, cores, output["Batch size"], allocator,
+                     output["TS throughput"], output["TS latency mean"], output["predict_mean"]])
+    file.flush()
+    fcntl.flock(file, fcntl.LOCK_UN)
     file.close()
+
+
+# For now manually run optimizer and store the results here
+solution = {
+    "resnet50": {
+        "default": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
+        "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16}
+    },
+    "inception": {
+        "default": {8: 8, 16: 8, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
+        "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16}
+    },
+    "bert": {
+        "default": {8: 4, 16: 4, 32: 4, 64: 4, 128: 16, 256: 16, 512: 16, 1024: 16},
+        "tcmalloc": None
+    },
+    "gpt2": None,
+    "mobilenet": {
+        "default": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
+        "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
+    },
+    "squeezenet": {
+        "default": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
+        "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
+    }
+}
+
+
+def custom():
+    core_count = 16
+    multiinstance = execution_params["multiinstance"]
+    if not multiinstance:
+        workers = 1
+        for b in range(0, 8):
+            for cores in range(1, core_count + 1):
+                batch_size = 2 ** b
+                run_singe_instance(workers, cores, batch_size)
+    else:
+        for b in range(3, 11):
+            batch_size = 2 ** b
+            # Fat instance
+            run_singe_instance(1, core_count, batch_size)
+
+            # Multi-instance
+            workers = solution[execution_params["model"]
+                               ][execution_params["allocator"]][batch_size]
+            thin_cores = int(core_count / workers)
+            thin_batch = int(batch_size / workers)
+            run_singe_instance(workers, thin_cores, thin_batch)
+            shutil.rmtree(
+                os.path.join("./", "logs"), ignore_errors=True
+            )
 
 
 update_plan_params = {
