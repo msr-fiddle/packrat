@@ -31,8 +31,7 @@ class InceptionBench(implements(Bench)):
                 model, data)).timeit(number=10)
 
     def get_test_data(self, config: Config) -> torch.Tensor:
-        url, filename = (
-            "https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog.jpg")
+        url, filename = ("https://github.com/pytorch/hub/raw/master/images/dog.jpg", "dog-{}.jpg".format(config.instance_id))
         try:
             urllib.request.urlretrieve(url, filename)
         except urllib.error.HTTPError:

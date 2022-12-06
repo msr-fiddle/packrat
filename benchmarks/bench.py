@@ -5,6 +5,7 @@ import torch
 import os
 import csv
 import logging
+import fcntl
 
 from .cache import store
 from .config import Benchmark, Config, Optimizations, ModelSource
@@ -88,7 +89,8 @@ class Bench(Interface):
                 self.latencies.sort()
                 filename = config.benchmark.name + "_latency.csv"
                 exists = os.path.isfile(filename)
-                writer = csv.writer(open(filename, "a+"), delimiter=",")
+                l_file = open(filename, "a+")
+                writer = csv.writer(l_file, delimiter=",")
 
                 if not exists:
                     writer.writerow(
@@ -97,21 +99,26 @@ class Bench(Interface):
                     self.latencies)) * 1000, self.latencies[-1] * 1000
                 lat = sum(self.latencies)
                 flops = (config.flops / lat)/1e9
+                fcntl.flock(l_file, fcntl.LOCK_EX)
                 writer.writerow(
                     row + [min, max, avg, flops])
+                fcntl.flock(l_file, fcntl.LOCK_UN)
 
         def report_throughput():
             if len(self.latencies) > 0:
                 filename = config.benchmark.name + "_throughput.csv"
                 exists = os.path.isfile(filename)
-                writer = csv.writer(open(filename, "a+"), delimiter=",")
+                t_file = open(filename, "a+")
+                writer = csv.writer(t_file, delimiter=",")
                 if not exists:
                     writer.writerow(
                         row_header + ["throughput"])
                 throughput = (config.batch_size *
                               config.iterations) / sum(self.latencies)
+                fcntl.flock(t_file, fcntl.LOCK_EX)
                 writer.writerow(
                     row + [throughput])
+                fcntl.flock(t_file, fcntl.LOCK_UN)
 
         report_latency()
         report_throughput()
