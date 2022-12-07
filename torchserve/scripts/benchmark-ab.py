@@ -506,6 +506,7 @@ def generate_report(warm_up_lines):
     click.secho("\n\nGenerating Reports...", fg="green")
     extract_metrics(warm_up_lines=warm_up_lines)
     output = generate_csv_output()
+    generate_latency_output()
     generate_latency_graph()
     generate_profile_graph()
     click.secho("\nTest suite execution complete.", fg="green")
@@ -546,6 +547,35 @@ def extract_metrics(warm_up_lines):
         with open(out_fname, "w") as outf:
             all_lines = map(lambda x: x + "\n", all_lines)
             outf.writelines(all_lines)
+
+
+def generate_latency_output():
+    batch_size = execution_params["concurrency"]
+    with open(execution_params["metric_log"]) as f:
+        lines = f.readlines()
+
+    all_lines = []
+    pattern = re.compile("predictions")
+    for line in lines:
+        if pattern.search(line):
+            splitted = line.split(" ")
+            latency = splitted[11].strip()
+            all_lines.append(int(latency))
+
+    # sum list elements in chunk of batch_size
+    warm_up_lines = int(execution_params['requests']/10)
+    inference_lines = all_lines[warm_up_lines:]
+    print(len(inference_lines))
+    final = []
+    for i in range(0, len(inference_lines), batch_size):
+        chunk = all_lines[i:i + batch_size]
+        final.append(int(sum(chunk) / batch_size))
+    out_fname = os.path.join(
+        *(execution_params["tmp_dir"], "benchmark", "latency.txt"))
+    #assert len(final) == 100
+    with open(out_fname, "w") as outf:
+        final = map(lambda x: str(x) + "\n", final)
+        outf.writelines(final)
 
 
 def generate_csv_output():
