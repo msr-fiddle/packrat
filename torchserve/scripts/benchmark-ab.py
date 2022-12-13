@@ -861,11 +861,11 @@ def create_torchscripted_model(model):
     traced_script_module.save(f"{model}.pt")
 
 
-def create_mar(model):
+def create_mar(model, version):
     cmd = [
         "torch-model-archiver",
-        f"--model-name {model}",
-        "--version 1.0",
+        f"--model-name {model}_v{version}",
+        f"--version {version}",
         f"--serialized-file {model}.pt",
         "--handler image_classifier",
         "--force",
@@ -875,8 +875,8 @@ def create_mar(model):
     os.remove(Path(os.getcwd()).joinpath(model + ".pt"))
 
 
-def move_mar_file(model):
-    mar_file = f"{model}.mar"
+def move_mar_file(model, version):
+    mar_file = f"{model}_v{version}.mar"
     mar_path = Path(os.getcwd()).joinpath(mar_file)
     model_store = Path(execution_params["tmp_dir"], "model_store/")
     if not os.path.exists(model_store):
@@ -902,11 +902,11 @@ def download_input(url, filename: str):
         img.save(filename)
 
 
-def setup(model, image, filename):
+def setup(model, version, image, filename):
     # Create torchscript based mar file for the given model
     create_torchscripted_model(model)
-    create_mar(model)
-    move_mar_file(model)
+    create_mar(model, version)
+    move_mar_file(model, version)
 
     # Download the sample input image
     download_input(image, filename)
@@ -947,12 +947,13 @@ def handle_model_specific_inputs():
     )
     model = execution_params["model"]
     if model in [Models.resnet50.name, Models.mobilenet.name, Models.inception.name]:
+        version = "1.0"
         input = "https://github.com/pytorch/hub/raw/master/images/dog.jpg"
         filename = "dog.jpg"
-        setup(model, input, filename)
+        setup(model, version, input, filename)
 
         # Update the execution parameters
-        execution_params["url"] = f"{model}.mar"
+        execution_params["url"] = f"{model}_v{version}.mar"
         execution_params["input"] = f"{filename}"
     elif model == Models.bert.name:
         execution_params["url"] = "https://torchserve.pytorch.org/mar_files/BERTSeqClassification_torchscript.mar"
@@ -970,8 +971,7 @@ def handle_model_specific_inputs():
         raise Exception("Model is not handled yet!")
 
 
-def update_config(cores):
-    file_path = "config.properties"
+def update_config(file_path, cores):
     workers = execution_params["workers"]
     allocator = execution_params["allocator"]
     os.system(f'sed -i "$ d" {file_path}')
@@ -985,8 +985,11 @@ def update_config(cores):
     elif allocator == "tcmalloc":
         use_allocator = "--enable_tcmalloc"
 
-    os.system(
-        f"echo cpu_launcher_args={use_multiinstance} {use_allocator} --ninstances {workers} --ncore_per_instance {cores} --node_id 0 >> {file_path}")
+    if cores == 1:
+        os.environ["TS_CPU_LAUNCHER_ARGS"] = f"--node_id 0 {use_allocator} --ninstances 16 --ncore_per_instance 1"
+    else:
+        os.system(
+            f"echo cpu_launcher_args=--node_id 0 {use_allocator} --ninstances {workers} --ncore_per_instance {cores} >> {file_path}")
 
 
 def run_singe_instance(workers: int, cores: int, batch_size: int):
@@ -1009,7 +1012,7 @@ def run_singe_instance(workers: int, cores: int, batch_size: int):
         execution_params["batch_size"]
     execution_params["requests"] = execution_params["concurrency"] * 100
 
-    update_config(cores)
+    update_config("config.properties", cores)
     handle_model_specific_inputs()
     output = benchmark()
     fcntl.flock(file, fcntl.LOCK_EX)
@@ -1044,6 +1047,128 @@ solution = {
         "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
     }
 }
+
+
+def register_model_with_version(version):
+    click.secho("*Registering model v2...", fg="green")
+    url = execution_params["management_url"] + "/models"
+    data = {
+        "model_name": f"{execution_params['model']}",
+        "url": f"{execution_params['model']}_v{version}.mar",
+        "batch_delay": execution_params["batch_delay"],
+        "batch_size": 4,
+        "initial_workers": 0,
+        "model_version": version,
+        "synchronous": "true",
+    }
+    resp = requests.post(url, params=data)
+    if not resp.status_code == 200:
+        failure_exit(f"Failed to register model.\n{resp.text}")
+    click.secho(resp.text)
+
+
+def run_ab(version, requests):
+    click.secho("\n\nExecuting inference performance tests ...", fg="green")
+    ab_cmd = (
+        f"ab -s 120 -c {execution_params['concurrency']}  -n {requests} -k -p "
+        f"{execution_params['tmp_dir']}/benchmark/input -T  {execution_params['content_type']} "
+        f"{execution_params['inference_url']}/{execution_params['inference_model_url']}/{version} > "
+        f"{execution_params['result_file']}"
+    )
+    execute(ab_cmd, wait=True)
+    os.system(f"cat {execution_params['result_file']}")
+
+
+def scale_workers(version, workers: int):
+    os.system(
+        f"cat {execution_params['tmp_dir']}/benchmark/conf/{execution_params['config_properties_name']}")
+    url = execution_params["management_url"] + \
+        "/models/" + execution_params["model"] + "/" + str(version)
+    params = (("min_worker", str(workers)), ("asynchronous", "true"))
+    requests.put(url, params=params)
+
+
+def batch_config(version, T: int, B: int):
+    core_count = T
+    batch_size = B
+
+    workers = solution[execution_params["model"]
+                       ][execution_params["allocator"]][batch_size]
+    thin_cores = int(core_count / workers)
+    thin_batch = int(batch_size / workers)
+
+    execution_params["batch_size"] = thin_batch
+    execution_params["workers"] = workers
+    execution_params["batch_delay"] = 100 * \
+        execution_params["batch_size"]
+    execution_params["concurrency"] = execution_params["workers"] * \
+        execution_params["batch_size"]
+    execution_params["requests"] = execution_params["concurrency"] * 100
+    if version == "1.0":
+        config_path = execution_params["config_properties_name"]
+    else:
+        config_path = f"{execution_params['tmp_dir']}/benchmark/conf/{execution_params['config_properties_name']}"
+    update_config(config_path, thin_cores)
+    return workers
+
+
+def check_model_config(version):
+    url = execution_params["management_url"] + \
+        "/models/" + execution_params["model"] + "/" + str(version)
+    resp = requests.get(url)
+    if not resp.status_code == 200:
+        failure_exit(f"Failed to get model config.\n{resp.text}")
+    return resp.json()
+
+
+def bench(old_batch: int, new_batch: int):
+    core_count = 16
+    # Run the optimal old batch size
+
+    click.secho(f"{execution_params}", fg="blue")
+    check_torchserve_health()
+    warm_up_lines = warm_up()
+    register_model_with_version("2.0")
+    run_ab("1.0", old_batch * 100)
+
+    # Run the suboptimal old batch size
+    execution_params['concurrency'] = new_batch
+    run_ab("1.0", old_batch * 100)
+
+    # Run the optimal new batch size
+    workers = batch_config("2.0", core_count, new_batch)
+    scale_workers("2.0", workers)
+
+    ready = False
+    while not ready:
+        run_ab("1.0", old_batch * 50)
+        model_config = check_model_config("2.0")
+        if len(model_config[0]["workers"]) == workers:
+            ready = True
+            for worker in model_config[0]["workers"]:
+                ready = ready and worker["status"] == "READY"
+
+    scale_workers("1.0", 0)
+    run_ab("2.0", new_batch * 100)
+
+
+def config_change():
+    # Batch 8 and 64
+    execution_params["model"] = Models.inception.name
+    execution_params["allocator"] = "default"
+
+    old_batch = 8
+    new_batch = 64
+
+    batch_config("1.0", 16, old_batch)
+    handle_model_specific_inputs()
+    prepare_local_dependency()
+
+    # Register model
+    setup(execution_params["model"], "2.0", "https://github.com/pytorch/hub/raw/master/images/dog.jpg",
+          "dog.jpg")
+    local_torserve_start()
+    bench(old_batch, new_batch)
 
 
 def custom():
@@ -1081,6 +1206,7 @@ update_plan_params = {
     "bert_batch": bert_batch,
     "workflow_nmt": workflow_nmt,
     "custom": custom,
+    "config_change": config_change,
 }
 
 if __name__ == "__main__":
