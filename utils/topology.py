@@ -57,7 +57,6 @@ class CPUInfo():
         for key in self.mapping[node_id].keys():
             for thread in self.mapping[node_id][key].keys():
                 threads.append(int(thread))
-        threads.sort()
         return threads
 
     def get_sockets(self) -> set:
