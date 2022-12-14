@@ -64,12 +64,12 @@ transformer_setting = {
     "mode": "text_generation",
     "do_lower_case": True,
     "num_labels": 0,
-    "save_mode": "torchscript",
+    "save_mode": "pretrained",
     "max_length": 150,
     "captum_explanation": False,
-    "embedding_name": "gpt2",
     "FasterTransformer": False,
     "model_parallel": False,
+    "embedding_name": "gpt2"
 }
 
 
@@ -122,7 +122,6 @@ transformer_setting = {
     "--input",
     "-i",
     default="dog.jpg",
-    type=click.Path(exists=True),
     help="The input file path for model",
 )
 @click.option(
@@ -914,9 +913,12 @@ def setup(model, image, filename):
 
 def create_gpt2():
     import json
+    shutil.rmtree(
+        os.path.join("./", "Transformer_model/"), ignore_errors=True
+    )
 
     model = Models.gpt2.name
-    path = "./serve/examples/Huggingface_Transformers/setup_config.json"
+    path = "setup_config.json"
     with open(path, 'w') as file:
         json_data = json.dumps(transformer_setting, indent=1)
         file.write(json_data)
@@ -932,10 +934,11 @@ def create_gpt2():
         "torch-model-archiver",
         f"--model-name {model}",
         "--version 1.0",
-        "--serialized-file ./Transformer_model/traced_model.pt",
+        "--serialized-file ./Transformer_model/pytorch_model.bin",
         "--handler ./serve/examples/Huggingface_Transformers/Transformer_handler_generalized.py",
-        "--extra-files \"./serve/examples/Huggingface_Transformers/setup_config.json\""
+        "--extra-files \"./Transformer_model/config.json,setup_config.json\""
     ]
+
     os.system(" ".join(cmd))
     move_mar_file(model)
 
@@ -966,6 +969,7 @@ def handle_model_specific_inputs():
         create_gpt2()
         execution_params["url"] = f"{model}.mar"
         execution_params["input"] = "./serve/examples/Huggingface_Transformers/Text_gen_artifacts/sample_text.txt"
+        execution_params["content_type"] = "Application/text"
     else:
         raise Exception("Model is not handled yet!")
 
@@ -1034,7 +1038,10 @@ solution = {
         "default": {8: 4, 16: 4, 32: 4, 64: 4, 128: 16, 256: 16, 512: 16, 1024: 16},
         "tcmalloc": None
     },
-    "gpt2": None,
+    "gpt2": {
+        "default": {8: 4, 16: 8, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
+        "tcmalloc": None
+    },
     "mobilenet": {
         "default": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
         "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
