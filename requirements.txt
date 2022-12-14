@@ -8,3 +8,4 @@ python-interface
 pandas
 plotnine
 pyarrow
+intel_extension_for_pytorch==1.12.*

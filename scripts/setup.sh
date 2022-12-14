@@ -14,6 +14,26 @@ fi
 
 APPEND="--yes --no-install-recommends"
 
+install_torchserve() {
+    $APT install apache2-utils
+    $APT install libgit2-dev
+
+    pip install pygit2
+    pip install click
+    pip install click_config_file
+    pip install captum
+
+    # Install torchserve
+    git submodule update --init
+    cd torchserve/serve
+    python ts_scripts/install_dependencies.py
+    python ts_scripts/install_from_src.py
+
+    $APT install libjpeg-dev
+    sudo pip install --prefix=/opt/intel/ipp ipp-devel
+    pip install git+https://github.com/pytorch/accimage
+}
+
 install_vtune() {
     $APT install wget gnupg $APPEND
     $APT install kmod software-properties-common pkg-config $APPEND
@@ -87,7 +107,7 @@ system_settings() {
 }
 
 # Check the number of arguments
-USAGE="Usage: $0 [deps|rust|system|torch|vtune]"
+USAGE="Usage: $0 [deps|rust|system|torch|vtune|torchserve]"
 if [ $# -ne 1 ]; then
   echo $USAGE
   exit 1
@@ -103,6 +123,8 @@ elif [ "$1" == "torch" ]; then
   install_torch
 elif [ "$1" == "vtune" ]; then
   install_vtune
+elif [ "$1" == "torchserve" ]; then
+  install_torchserve
 else
   echo $USAGE
   exit 1
