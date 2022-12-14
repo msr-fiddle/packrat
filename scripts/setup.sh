@@ -30,7 +30,7 @@ install_torchserve() {
     python ts_scripts/install_from_src.py
 
     $APT install libjpeg-dev
-    sudo pip install --prefix=/opt/intel/ipp ipp-devel
+    $SUDO pip install --prefix=/opt/intel/ipp ipp-devel
     pip install git+https://github.com/pytorch/accimage
 }
 
@@ -106,8 +106,20 @@ system_settings() {
   $SUDO sh -c "echo 1 > /proc/sys/kernel/perf_event_paranoid"
 }
 
+config_cloudlab_box() {
+  git config --global user.name "Ankit Bhardwaj"
+  git config --global user.email "bhrdwj.ankit@gmail.com"
+  git config core.editor vim
+
+  size=$(df -h --output=size / | awk 'NR==2{print $1}')
+  if [ $size != "50G" ]; then
+    export RESIZEROOT=50
+    $SUDO bash scripts/grow-rootfs.sh
+  fi
+}
+
 # Check the number of arguments
-USAGE="Usage: $0 [deps|rust|system|torch|vtune|torchserve]"
+USAGE="Usage: $0 [deps|rust|system|torch|vtune|torchserve|cloudlab]"
 if [ $# -ne 1 ]; then
   echo $USAGE
   exit 1
@@ -125,6 +137,8 @@ elif [ "$1" == "vtune" ]; then
   install_vtune
 elif [ "$1" == "torchserve" ]; then
   install_torchserve
+elif [ "$1" == "cloudlab" ]; then
+  config_cloudlab_box
 else
   echo $USAGE
   exit 1
