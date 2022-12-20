@@ -1,11 +1,11 @@
-date,revision,path,resnetbench,inceptionbench,gptbench,bertbench
-2022-06-24,efb6225,,index.html
-2022-06-29,6eb235b,,index.html
-2022-07-08,cdf1d77,,index.html,index.html,index.html,index.html
-2022-07-18,numa,,index.html
-2022-07-20,numa-interleave,,index.html
-2022-07-20,numa-interleave-no-omp,,index.html
-2022-07-28,flops,,index.html
-2022-07-29,large-batches,,index.html,index.html,index.html,index.html
-2022-08-10,local-vs-remote-mem,,index.html
-2022-08-17,thread-assignment,,index.html
+date,revision,path,resnetbench,inceptionbench,gptbench,bertbench,comments
+24-06-2022,efb6225,,index.html,,,,Eager vs channel last vs IPEX
+29-06-2022,6eb235b,,index.html,,,,Inter vs intra heatmaps
+08-07-2022,cdf1d77,,index.html,index.html,index.html,index.html,Eager vs graph
+18-07-2022,numa,,index.html,,,,Threads=1 to 36
+20-07-2022,numa-interleave,,index.html,,,,Interleaved thread mapping
+20-07-2022,numa-interleave-no-omp,,index.html,,,,Interleaved thread mapping without OMP flags
+28-07-2022,flops,,index.html,,,,FLOPS vs batch size
+29-07-2022,large-batches,,index.html,index.html,index.html,index.html,BS=1 to 1024 + opt=graph + interleave vs sequential
+10-08-2022,local-vs-remote-mem,,index.html,,,,Local vs remote memory access
+17-08-2022,thread-assignment,,index.html,,,,OMP vs numactl vs none for thread assignment

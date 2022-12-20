@@ -173,7 +173,7 @@
 }
 
 .page-heading {
-    font-size: 20px;
+    font-size: 24px;
     color: MediumVioletRed;
 }
 
@@ -196,7 +196,29 @@
     font-size: 24px;
 }
 
-
+.post-table {
+    table-layout: auto;
+    width: 100%;
+    border-collapse: collapse;
+    margin-left: auto;
+    margin-bottom: $spacing-unit;
+    text-align: center;
+    th, td {
+        height: $spacing-unit;
+        font-size: 20px;
+        font-family: 'Times New Roman', Times, serif;
+        border-bottom: 1px solid white;
+        border-top: 1px solid white;
+        border-right: 1px solid gainsboro;
+        border-left: 1px solid gainsboro;
+        white-space: normal!important;
+        word-wrap: break-word;
+    };
+    th {
+        background-color: gainsboro;
+    };
+    tr:hover {background-color: gainsboro;};
+}
 
 /**
  * Posts
