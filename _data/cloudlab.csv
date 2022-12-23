@@ -4,4 +4,4 @@ date,revision,path,resnetbench,inceptionbench,gptbench,bertbench,comments
 19-12-2022,pytorch-ht,,index.html,,,index.html,Cores vs HT for PT
 21-11-2022,torchserve,,index.html,,,,TS with inefficient pre-processing
 21-11-2022,torchserve-opt,,index.html,,,index.html, TS with efficient pre-processing + TS vs PT
-28-11-2022,torchserve-allocators,,index.html,,,,Default vs tcmalloc for TS
+28-11-2022,torchserve-allocators,,index.html,index.html,,,Default vs tcmalloc for TS
