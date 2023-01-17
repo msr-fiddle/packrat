@@ -32,7 +32,8 @@ install_torchserve() {
     $APT install libjpeg-dev $APPEND
     $SUDO pip install --prefix=/opt/intel/ipp ipp-devel
     pip install git+https://github.com/pytorch/accimage
-    echo "Add install director to the PATH".
+    echo "Add install directory to the PATH".
+    export LD_LIBRARY_PATH=/opt/intel/ipp/lib:$LD_LIBRARY_PATH
 }
 
 install_vtune() {
@@ -55,7 +56,7 @@ install_torch() {
 install_deps() {
     # Basic python-related deps
     $APT update --yes
-    $APT install python3-pip $APPEND
+    python3 -m pip install pip==20.0.2
     $APT install python-is-python3 python3-autopep8 pylint $APPEND
     $APT install gcc python3-dev $APPEND
     $APT install make build-essential $APPEND
