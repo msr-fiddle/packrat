@@ -17,15 +17,24 @@ import pickle
 import pandas as pd
 
 
-def get_data(model: str, benchmark: str, profile_tag: str):
+def get_data(framework, model: str, benchmark: str, profile_tag: str):
     """
     Get the data from the benchmark.
     :param model: model name
     :param benchmark: benchmark type latency or throughput
     :return: dataframe
     """
+    if framework == "torchserve":
+        if model == "resnet":
+            name = "resnet50"
+        else:
+            name = model
+        csv = f"{name}_results.csv"
+    elif framework == "pytorch":
+        csv = f"{model}_{benchmark}.csv"
+
     base = "https://msr-fiddle.github.io/naf"
-    url = f"{base}/{model}/cloudlab/{profile_tag}/{model}_{benchmark}.csv"
+    url = f"{base}/{model}/cloudlab/{profile_tag}/{csv}"
     print(f" > Fetching {url} ...", end='')
     try:
         with urllib.request.urlopen(url) as response:
@@ -37,34 +46,53 @@ def get_data(model: str, benchmark: str, profile_tag: str):
         return None
 
 
-def format_data(data, allocator, optimization):
+def format_data(framework, data, allocator, optimization):
     """
     Format the data into a matrix.
     :param data: dataframe
     :return: matrix
     """
-    filter_list = ["topology", "intraop_threads", "batch_size", "latency(avg)"]
-    if allocator != None:
-        data = data.loc[data["allocator"] == allocator]
-        filter_list.append("allocator")
-    if optimization != None:
-        data = data.loc[data["benchmark"].str.contains(optimization)]
-        filter_list.append("benchmark")
+    if framework == "torchserve":
+        filter_list = ["cores", "batch_size", "mean_ts_latency"]
+        if allocator != None:
+            data = data.loc[data["allocator"] == allocator]
+            filter_list.append("allocator")
+        data = data.loc[:, filter_list]
+        latencies = {}
+        for thread in data.cores.unique():
+            batch_latencies = {}
+            for batch in data.batch_size.unique():
+                latency = data.loc[(data["cores"] == thread) &
+                                   (data["batch_size"] == batch)]["mean_ts_latency"].values[0]
+                batch_latencies[batch] = latency
 
-    data = data.loc[:, filter_list]
+            latencies[thread] = batch_latencies
 
-    latencies = {}
-    for thread in data.intraop_threads.unique():
-        batch_latencies = {}
-        for batch in data.batch_size.unique():
-            latency = data.loc[(data["intraop_threads"] == thread) &
-                               (data["batch_size"] == batch) &
-                               (data["topology"] == "sequential")]["latency(avg)"].values[0]
-            batch_latencies[batch] = latency
+        return latencies
+    elif framework == "pytorch":
+        filter_list = ["topology", "intraop_threads",
+                       "batch_size", "latency(avg)"]
+        if allocator != None:
+            data = data.loc[data["allocator"] == allocator]
+            filter_list.append("allocator")
+        if optimization != None:
+            data = data.loc[data["benchmark"].str.contains(optimization)]
+            filter_list.append("benchmark")
 
-        latencies[thread] = batch_latencies
+        data = data.loc[:, filter_list]
 
-    return latencies
+        latencies = {}
+        for thread in data.intraop_threads.unique():
+            batch_latencies = {}
+            for batch in data.batch_size.unique():
+                latency = data.loc[(data["intraop_threads"] == thread) &
+                                   (data["batch_size"] == batch) &
+                                   (data["topology"] == "sequential")]["latency(avg)"].values[0]
+                batch_latencies[batch] = latency
+
+            latencies[thread] = batch_latencies
+
+        return latencies
 
 
 class Optimizer:
@@ -72,21 +100,24 @@ class Optimizer:
     Configuration optimizer for the benchmark.
     """
 
-    def __init__(self, model, allocator, optimization, profile_tag, preprocessed=False):
+    def __init__(self, framework, model, allocator, optimization, profile_tag, preprocessed=False):
         """Initialize the optimizer."""
-        print(f"Optimize {model} with {allocator} allocator and Optimization={optimization}")
+        print(
+            f"Optimize {model} for {framework} with {allocator} allocator and Optimization={optimization}")
+        if framework not in ["torchserve", "pytorch"]:
+            raise Exception("Framework not supported")
         self.workloads = []
         self.opt = {}
         self.latencies = {}
 
-        self.add_model(model, allocator, optimization,
+        self.add_model(framework, model, allocator, optimization,
                        profile_tag, preprocessed)
 
-    def add_model(self, model, allocator, optimization, profile_tag, preprocessed):
+    def add_model(self, framework, model, allocator, optimization, profile_tag, preprocessed):
         """Add a new model to the optimizer."""
         self.workloads.append(model)
-        self.latencies[model] = format_data(
-            get_data(model, "latency", profile_tag), allocator, optimization)
+        self.latencies[model] = format_data(framework,
+                                            get_data(framework, model, "latency", profile_tag), allocator, optimization)
         try:
             if not preprocessed:
                 raise FileNotFoundError
@@ -154,7 +185,7 @@ class Optimizer:
 
 if __name__ == "__main__":
     model = "resnet"
-    optimizer = Optimizer(model=model, allocator="default",
+    optimizer = Optimizer(framework="pytorch", model=model, allocator="default",
                           optimization="script", profile_tag="large-batches")
     for i in range(0, 11):
         instances = []
