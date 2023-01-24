@@ -1,5 +1,7 @@
 use std::sync::mpsc::Sender;
 
+use crate::loadgen::LoadGen;
+
 pub struct Producer {
     sender: Sender<u64>,
 }
@@ -9,7 +11,7 @@ impl Producer {
         Self { sender }
     }
 
-    pub fn produce(&mut self) {
-        self.sender.send(1).unwrap();
+    pub fn produce(&mut self, loadgen: &mut dyn LoadGen) {
+        loadgen.run(&mut self.sender);
     }
 }

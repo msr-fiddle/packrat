@@ -1,9 +1,11 @@
 use std::sync::mpsc::channel;
 
 mod consumer;
+mod loadgen;
 mod producer;
 
 use consumer::Consumer;
+use loadgen::*;
 use producer::Producer;
 
 fn main() {
@@ -12,7 +14,7 @@ fn main() {
     // Spawn a thread to produce a value
     let p = std::thread::spawn(move || {
         let mut producer = Producer::new(producer);
-        producer.produce();
+        producer.produce(&mut Diurnal::new(0, 1000, 1000, 100));
     });
 
     // Spawn a thread to consume a value

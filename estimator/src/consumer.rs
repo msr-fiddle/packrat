@@ -25,7 +25,11 @@ impl Consumer {
     pub fn consume(&mut self) {
         let start = std::time::Instant::now();
         loop {
-            let remaining = self.timeout - start.elapsed().as_millis();
+            let remaining = if self.timeout > start.elapsed().as_millis() {
+                self.timeout - start.elapsed().as_millis()
+            } else {
+                0
+            };
             match self
                 .receiver
                 .recv_timeout(Duration::from_millis(remaining as u64))
@@ -68,14 +72,14 @@ impl Consumer {
         // Decrease batch size if timed out multiple times.
         // Otherwise, increased the batch size using EWMA.
         if self.num_timeouts >= 3 {
-            self.current_bs = self.current_bs / 2;
+            self.current_bs /= 2;
         } else {
             let last_n_queue_size = self.last_n_queue_size.iter().sum::<u64>();
             let last_n_queue_size = last_n_queue_size as f64 / self.last_n_queue_size.len() as f64;
             let expected_bs = (self.current_bs as f64 * 0.9 + last_n_queue_size * 0.1) as usize;
 
             if expected_bs >= 2 * self.current_bs {
-                self.current_bs = expected_bs;
+                self.current_bs *= 2;
             }
         }
 
@@ -83,17 +87,14 @@ impl Consumer {
             println!("Batch size is 0. Exiting...");
             std::process::exit(0);
         }
+        println!("Current batch size: {}", self.current_bs);
         assert!(self.current_bs.is_power_of_two());
     }
 }
 
 pub fn delay_loop(delay: u128) {
     let start = std::time::Instant::now();
-    loop {
+    while start.elapsed().as_millis() < delay {
         spin_loop();
-        let remaining = delay - start.elapsed().as_millis();
-        if remaining <= 0 {
-            break;
-        }
     }
 }
