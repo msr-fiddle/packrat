@@ -18,23 +18,22 @@ install_torchserve() {
     $APT install apache2-utils $APPEND
     $APT install libgit2-dev $APPEND
     $APT install git $APPEND
-
-    pip install pygit2==1.6.1
-    pip install click
-    pip install click_config_file
-    pip install captum
+    $APT install openjdk-17-jdk nodejs wget $APPEND
 
     # Install torchserve
     git submodule update --init
     cd torchserve/serve
-    python ts_scripts/install_dependencies.py
+    #python ts_scripts/install_dependencies.py
     python ts_scripts/install_from_src.py
 
     $APT install libjpeg-dev $APPEND
     $SUDO pip install --prefix=/opt/intel/ipp ipp-devel
     pip install git+https://github.com/pytorch/accimage
-    echo "Add install directory to the PATH".
-    export LD_LIBRARY_PATH=/opt/intel/ipp/lib:$LD_LIBRARY_PATH
+
+    cp /usr/lib/x86_64-linux-gnu/libtcmalloc.so.4 $HOME/.local/lib/libtcmalloc.so
+    echo "export PATH=$HOME/.local/bin:$PATH" >> ~/.bashrc
+    echo "export LD_LIBRARY_PATH=/opt/intel/ipp/lib:$LD_LIBRARY_PATH" >> ~/.bashrc
+    echo "Update environment variables using source ~/.bashrc".
 }
 
 install_vtune() {
@@ -51,7 +50,7 @@ install_vtune() {
 }
 
 install_torch() {
-    python3 -m pip install -r requirements.txt
+    python3 -m pip install -r requirements.txt --user
 }
 
 install_deps() {
