@@ -1,7 +1,9 @@
 import csv
+from glob import glob
 import json
 import os
 from pathlib import Path
+from posixpath import expanduser
 import re
 import shutil
 import sys
@@ -988,6 +990,22 @@ def update_config(cores):
         use_allocator = "--use_default_allocator"
     elif allocator == "tcmalloc":
         use_allocator = "--enable_tcmalloc"
+
+        # Check if tcmalloc is installed
+        library_paths = []
+        library_paths += ["{}/.local/lib/".format(expanduser("~")), "/usr/local/lib/",
+                          "/usr/local/lib64/", "/usr/lib/", "/usr/lib64/"]
+        lib_type = "tcmalloc"
+        lib_find = False
+        for lib_path in library_paths:
+            library_file = lib_path + "lib" + lib_type + ".so"
+            matches = glob(library_file)
+            if len(matches) > 0:
+                lib_find = True
+                break
+        if not lib_find:
+            click.secho("tcmalloc library not found...", fg="red")
+            sys.exit(1)
 
     os.system(
         f"echo cpu_launcher_args={use_multiinstance} {use_allocator} --ninstances {workers} --ncore_per_instance {cores} --node_id 0 >> {file_path}")
