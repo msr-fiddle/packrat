@@ -17,6 +17,7 @@ APPEND="--yes --no-install-recommends"
 install_torchserve() {
     $APT install apache2-utils $APPEND
     $APT install libgit2-dev $APPEND
+    $APT install git $APPEND
 
     pip install pygit2==1.6.1
     pip install click
@@ -56,10 +57,14 @@ install_torch() {
 install_deps() {
     # Basic python-related deps
     $APT update --yes
-    python3 -m pip install pip==20.0.2
     $APT install python-is-python3 python3-autopep8 pylint $APPEND
     $APT install gcc python3-dev $APPEND
     $APT install make build-essential $APPEND
+    $APT install apt-utils $APPEND
+
+    # Install pip
+    $APT install python3-pip $APPEND
+    python3 -m pip install pip==20.0.2
 
     # PAPI related deps
     $APT install papi-tools $APPEND
