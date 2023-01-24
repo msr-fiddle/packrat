@@ -13,11 +13,12 @@ bash scripts/setup.sh torch
 ```bash
 python run.py --help
 ```
+Check [bench.md](./bench.md) for more details.
 
 ## Build and Run docker image
 ```bash
 docker build -t bench .
-docker run -v `pwd`:/app -it bench:latest
+docker run bench:latest
 ```
 
 To run VTune inside docker image
