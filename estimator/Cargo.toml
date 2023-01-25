@@ -2,7 +2,14 @@
 name = "estimator"
 version = "0.1.0"
 edition = "2021"
+authors = ["Ankit Bhardwaj <bhrdwj.ankit@gmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.dev]
+opt-level = 3
+debug = true
+
 [dependencies]
+env_logger = "0.9.0"
+log = "0.4.14"

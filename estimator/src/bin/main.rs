@@ -1,20 +1,17 @@
 use std::sync::mpsc::channel;
 
-mod consumer;
-mod loadgen;
-mod producer;
-
-use consumer::Consumer;
-use loadgen::*;
-use producer::Producer;
+use estimator::consumer::Consumer;
+use estimator::loadgen::Diurnal;
+use estimator::producer::Producer;
 
 fn main() {
+    env_logger::init();
     let (producer, consumer) = channel::<u64>();
 
     // Spawn a thread to produce a value
     let p = std::thread::spawn(move || {
         let mut producer = Producer::new(producer);
-        producer.produce(&mut Diurnal::new(0, 1000, 1000, 100));
+        producer.produce(&mut Diurnal::new(1000));
     });
 
     // Spawn a thread to consume a value
