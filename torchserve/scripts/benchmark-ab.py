@@ -1,25 +1,27 @@
-import csv
-from glob import glob
-import json
-import os
-from pathlib import Path
-from posixpath import expanduser
-import re
-import shutil
-import sys
-import tempfile
-import time
-from subprocess import PIPE, Popen
-from enum import Enum
-from urllib.parse import urlparse
-
-import click
-import click_config_file
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import requests
 import fcntl
+import requests
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import click_config_file
+import click
+import time
+import tempfile
+import shutil
+import re
+import os
+import json
+import csv
+import sys
+
+from urllib.parse import urlparse
+from enum import Enum
+from subprocess import PIPE, Popen
+from posixpath import expanduser
+from glob import glob
+from pathlib import Path
+
+sys.path.append(str(Path(sys.argv[0]).absolute().parent.parent.parent))
 
 default_ab_params = {
     "model": "resnet-18",
@@ -1042,35 +1044,6 @@ def run_singe_instance(workers: int, cores: int, batch_size: int):
     file.close()
 
 
-# For now manually run optimizer and store the results here
-solution = {
-    "resnet50": {
-        "default": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
-        "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16}
-    },
-    "inception": {
-        "default": {8: 8, 16: 8, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
-        "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16}
-    },
-    "bert": {
-        "default": {8: 4, 16: 4, 32: 4, 64: 4, 128: 16, 256: 16, 512: 16, 1024: 16},
-        "tcmalloc": {8: 4, 16: 4, 32: 4, 64: 8, 128: 16, 256: 16, 512: 16, 1024: 16}
-    },
-    "gpt2": {
-        "default": {8: 4, 16: 8, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
-        "tcmalloc": {8: 8, 16: 4, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
-    },
-    "mobilenet": {
-        "default": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
-        "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
-    },
-    "squeezenet": {
-        "default": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
-        "tcmalloc": {8: 8, 16: 16, 32: 16, 64: 16, 128: 16, 256: 16, 512: 16, 1024: 16},
-    }
-}
-
-
 def custom():
     core_count = 16
     multiinstance = execution_params["multiinstance"]
@@ -1081,14 +1054,25 @@ def custom():
                 batch_size = 2 ** b
                 run_singe_instance(workers, cores, batch_size)
     else:
+        from utils.optimizer import Optimizer
+        model = "resnet" if execution_params["model"] == "resnet50" else execution_params["model"]
+        optimizer = Optimizer(framework="torchserve", model=model,
+                              allocator=execution_params["allocator"], optimization="script", profile_tag="torchserve-allocators")
         for b in range(3, 11):
             batch_size = 2 ** b
             # Fat instance
             run_singe_instance(1, core_count, batch_size)
 
             # Multi-instance
-            workers = solution[execution_params["model"]
-                               ][execution_params["allocator"]][batch_size]
+            instances = []
+            try:
+                optimizer.solution(core_count, batch_size,
+                                   model, instances)
+            except Exception as e:
+                if batch_size > 128:
+                    print(e)
+                    instances = [0] * core_count
+            workers = len(instances)
             thin_cores = int(core_count / workers)
             thin_batch = int(batch_size / workers)
             run_singe_instance(workers, thin_cores, thin_batch)
