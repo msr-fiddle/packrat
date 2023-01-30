@@ -32,10 +32,10 @@ title:  "GPT-2"
 ## Throughput Per Allocator
 ### (Allocator = default) 
 <p float="left">
-<img src="./gpt2-throughput-script-perBS.png" alt="GPT2 Throughput per BS" width="100%"/>
+<img src="./gpt2-throughput-script-default-perBS.png" alt="GPT2 Throughput per BS" width="100%"/>
 </p>
 
 ### (Allocator = tcmalloc) 
 <p float="left">
-<img src="./gpt2-throughput-script-perBS-tcmalloc.png" alt="GPT2 Throughput per BS" width="100%"/>
+<img src="./gpt2-throughput-script-tcmalloc-perBS.png" alt="GPT2 Throughput per BS" width="100%"/>
 </p>

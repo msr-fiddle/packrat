@@ -32,10 +32,10 @@ title:  "Bert"
 ## Throughput Per Allocator
 ### (Allocator = default) 
 <p float="left">
-<img src="./default-throughput-script-perBS.png" alt="Bert Throughput per BS" width="100%"/>
+<img src="./bert-throughput-script-default-perBS.png" alt="Bert Throughput per BS" width="100%"/>
 </p>
 
 ### (Allocator = tcmalloc) 
 <p float="left">
-<img src="./tcmalloc-throughput-script-perBS.png" alt="Bert Throughput per BS" width="100%"/>
+<img src="./bert-throughput-script-tcmalloc-perBS.png" alt="Bert Throughput per BS" width="100%"/>
 </p>

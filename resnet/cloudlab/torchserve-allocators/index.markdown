@@ -32,10 +32,10 @@ title:  "ResNet50"
 ## Throughput Per Allocator
 ### (Allocator = default) 
 <p float="left">
-<img src="./resnet50-throughput-script-perBS.png" alt="ResNet Throughput per BS" width="100%"/>
+<img src="./resnet50-throughput-script-default-perBS.png" alt="ResNet Throughput per BS" width="100%"/>
 </p>
 
 ### (Allocator = tcmalloc) 
 <p float="left">
-<img src="./resnet50-throughput-script-perBS-tcmalloc.png" alt="ResNet Throughput per BS" width="100%"/>
+<img src="./resnet50-throughput-script-tcmalloc-perBS.png" alt="ResNet Throughput per BS" width="100%"/>
 </p>
