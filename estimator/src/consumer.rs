@@ -2,14 +2,18 @@ use log::*;
 use std::{
     cmp::min,
     collections::VecDeque,
-    sync::mpsc::Receiver,
+    sync::mpsc::{Receiver, Sender},
     time::{Duration, Instant},
 };
 
-use crate::utils::{delay_loop, lower_power_of_two};
+use crate::{
+    utils::{delay_loop, lower_power_of_two},
+    RECONFIG_TIMEOUT, SINGLE_REQUEST_DELAY,
+};
 
 pub struct Consumer {
     receiver: Receiver<u64>,
+    sender: Sender<u64>,
     request_queue: VecDeque<u64>,
     last_reconfig_time: Instant,
     reconfig_timeouts: Duration,
@@ -18,13 +22,14 @@ pub struct Consumer {
 }
 
 impl Consumer {
-    pub fn new(receiver: Receiver<u64>) -> Self {
+    pub fn new(receiver: Receiver<u64>, sender: Sender<u64>) -> Self {
         let request_queue = VecDeque::with_capacity(1024);
         Self {
             receiver,
+            sender,
             request_queue,
             last_reconfig_time: Instant::now(),
-            reconfig_timeouts: Duration::from_secs(100),
+            reconfig_timeouts: RECONFIG_TIMEOUT,
             current_bs: 1,
             last_n_queue_size: Vec::with_capacity(10),
         }
@@ -37,7 +42,7 @@ impl Consumer {
                 self.request_queue.push_back(value);
             }
         }
-        println!("Received {} requests", self.request_queue.len());
+        info!("Received {} requests", self.request_queue.len());
         self.last_n_queue_size.push(self.request_queue.len() as i64);
 
         match self.request_queue.len() {
@@ -63,14 +68,14 @@ impl Consumer {
     }
 
     fn handle_request(&mut self) {
-        let single_request_delay = 1;
         let process = min(self.request_queue.len(), self.current_bs);
 
         // Process `process` number of requests in the queue
         // TODO: delay using profiling data
         for _ in 0..process {
             let _drop = self.request_queue.pop_front();
-            delay_loop(single_request_delay);
+            delay_loop(SINGLE_REQUEST_DELAY);
+            self.sender.send(1).unwrap();
         }
         info!("Processed {} requests", process);
     }
@@ -83,7 +88,7 @@ impl Consumer {
                 let average_queue_size = last_n_queue_sum / self.last_n_queue_size.len() as i64;
                 let expected_bs =
                     (self.current_bs as f64 * 0.00 + average_queue_size as f64 * 1.0) as i64;
-                println!("Expected batch size: {}", expected_bs);
+                println!("Expected new batch size: {}", expected_bs);
 
                 let new_bs = match expected_bs {
                     x if x < 0 => lower_power_of_two(self.current_bs as i64 + x) as usize,
@@ -92,8 +97,8 @@ impl Consumer {
                 };
 
                 if new_bs != self.current_bs {
+                    println!(">>> Updated BS from {} to {}", self.current_bs, new_bs);
                     self.current_bs = new_bs;
-                    println!("Current batch size: {}", self.current_bs);
                     assert!(self.current_bs.is_power_of_two());
                 }
             }
@@ -113,8 +118,9 @@ mod tests {
 
     #[test]
     fn test_bs_increase() {
-        let channel = channel();
-        let mut consumer = Consumer::new(channel.1);
+        let req_channel = channel();
+        let res_channel = channel();
+        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
 
         (0..100).for_each(|_| consumer.last_n_queue_size.push(16));
@@ -127,8 +133,9 @@ mod tests {
 
     #[test]
     fn test_bs_decrease() {
-        let channel = channel();
-        let mut consumer = Consumer::new(channel.1);
+        let req_channel = channel();
+        let res_channel = channel();
+        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
         consumer.current_bs = 32;
 
@@ -142,8 +149,9 @@ mod tests {
 
     #[test]
     fn test_bs_no_change() {
-        let channel = channel();
-        let mut consumer = Consumer::new(channel.1);
+        let req_channel = channel();
+        let res_channel = channel();
+        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
         consumer.current_bs = 32;
 
@@ -157,15 +165,16 @@ mod tests {
 
     #[test]
     fn test_bs_increase_e2e() {
-        let channel = channel();
-        let mut consumer = Consumer::new(channel.1);
+        let req_channel = channel();
+        let res_channel = channel();
+        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
         consumer.reconfig_timeouts = Duration::from_secs(2);
         let new_bs = 16;
 
         let start = Instant::now();
         while consumer.current_bs == 1 {
-            (0..new_bs).for_each(|_| channel.0.send(1).unwrap());
+            (0..new_bs).for_each(|_| req_channel.0.send(1).unwrap());
             consumer.consume();
         }
         assert!(start.elapsed() > consumer.reconfig_timeouts);
@@ -174,15 +183,16 @@ mod tests {
 
     #[test]
     fn test_bs_approach_to_zero() {
-        let channel = channel();
-        let mut consumer = Consumer::new(channel.1);
+        let req_channel = channel();
+        let res_channel = channel();
+        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
         consumer.reconfig_timeouts = Duration::from_secs(2);
         let new_bs = 16;
 
         let start = Instant::now();
         while consumer.current_bs == 1 {
-            (0..new_bs).for_each(|_| channel.0.send(1).unwrap());
+            (0..new_bs).for_each(|_| req_channel.0.send(1).unwrap());
             consumer.consume();
         }
         assert!(start.elapsed() > consumer.reconfig_timeouts);
@@ -191,7 +201,7 @@ mod tests {
         let start = Instant::now();
         let new_bs = 1;
         while consumer.current_bs != 1 {
-            (0..new_bs).for_each(|_| channel.0.send(1).unwrap());
+            (0..new_bs).for_each(|_| req_channel.0.send(1).unwrap());
             consumer.consume();
             if start.elapsed() > consumer.reconfig_timeouts * 2 {
                 break;
