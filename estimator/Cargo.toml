@@ -13,3 +13,5 @@ debug = true
 [dependencies]
 env_logger = "0.9.0"
 log = "0.4.14"
+clap = {version = "4.1.4", features = ["derive"]}
+rand = "0.6.5"

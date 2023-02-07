@@ -19,6 +19,7 @@ pub struct Consumer {
     reconfig_timeouts: Duration,
     current_bs: usize,
     last_n_queue_size: Vec<i64>,
+    counter: usize,
 }
 
 impl Consumer {
@@ -32,6 +33,7 @@ impl Consumer {
             reconfig_timeouts: RECONFIG_TIMEOUT,
             current_bs: 1,
             last_n_queue_size: Vec::with_capacity(10),
+            counter: 0,
         }
     }
 
@@ -42,7 +44,7 @@ impl Consumer {
                 self.request_queue.push_back(value);
             }
         }
-        info!("Received {} requests", self.request_queue.len());
+        debug!("Received {} requests", self.request_queue.len());
         self.last_n_queue_size.push(self.request_queue.len() as i64);
 
         match self.request_queue.len() {
@@ -77,24 +79,30 @@ impl Consumer {
             delay_loop(SINGLE_REQUEST_DELAY);
             self.sender.send(1).unwrap();
         }
-        info!("Processed {} requests", process);
+        debug!("Processed {} requests", process);
     }
 
     fn update_bs(&mut self) {
         match self.last_n_queue_size.iter().sum::<i64>() {
             0 => self.current_bs = 0,
             _ => {
-                let last_n_queue_sum = self.last_n_queue_size.iter().sum::<i64>();
-                let average_queue_size = last_n_queue_sum / self.last_n_queue_size.len() as i64;
-                let expected_bs =
-                    (self.current_bs as f64 * 0.00 + average_queue_size as f64 * 1.0) as i64;
-                println!("Expected new batch size: {}", expected_bs);
+                let mut new_bs = self.current_bs;
+                let mut transient_bs = new_bs as f64;
 
-                let new_bs = match expected_bs {
-                    x if x < 0 => lower_power_of_two(self.current_bs as i64 + x) as usize,
-                    x if x > 0 => lower_power_of_two(x) as usize,
-                    x => x as usize,
-                };
+                for len in self.last_n_queue_size.iter() {
+                    let residual_queue_len = (*len - self.current_bs as i64) as f64;
+                    transient_bs = transient_bs * 0.1 + residual_queue_len * 0.9;
+                    debug!("Expected new batch size: {}", transient_bs);
+
+                    let bs = self.current_bs as i64 + transient_bs as i64;
+                    new_bs = lower_power_of_two(bs) as usize;
+
+                    info!(
+                        "{:?},{},{},{},{}",
+                        self.counter, self.current_bs, residual_queue_len, bs, new_bs
+                    );
+                    self.counter += 1;
+                }
 
                 if new_bs != self.current_bs {
                     println!(">>> Updated BS from {} to {}", self.current_bs, new_bs);
@@ -139,9 +147,9 @@ mod tests {
         assert_eq!(consumer.current_bs, 1);
         consumer.current_bs = 32;
 
-        (0..100).for_each(|_| consumer.last_n_queue_size.push(-16));
+        (0..100).for_each(|_| consumer.last_n_queue_size.push(16));
         assert_eq!(consumer.last_n_queue_size.len() as i64, 100);
-        assert_eq!(consumer.last_n_queue_size.iter().sum::<i64>(), -1600);
+        assert_eq!(consumer.last_n_queue_size.iter().sum::<i64>(), 1600);
 
         consumer.update_bs();
         assert_eq!(consumer.current_bs, 16);
@@ -200,12 +208,9 @@ mod tests {
 
         let start = Instant::now();
         let new_bs = 1;
-        while consumer.current_bs != 1 {
+        while start.elapsed() < consumer.reconfig_timeouts * 2 {
             (0..new_bs).for_each(|_| req_channel.0.send(1).unwrap());
             consumer.consume();
-            if start.elapsed() > consumer.reconfig_timeouts * 2 {
-                break;
-            }
         }
         assert!(start.elapsed() > consumer.reconfig_timeouts);
         assert_eq!(consumer.current_bs, 1);
