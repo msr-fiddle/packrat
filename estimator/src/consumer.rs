@@ -6,6 +6,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(not(test))]
+use std::{fs::OpenOptions, io::Write, path::Path};
+
 use crate::{
     utils::{delay_loop, lower_power_of_two},
     RECONFIG_TIMEOUT, SINGLE_REQUEST_DELAY,
@@ -20,10 +23,11 @@ pub struct Consumer {
     current_bs: usize,
     last_n_queue_size: Vec<i64>,
     counter: usize,
+    workload: String,
 }
 
 impl Consumer {
-    pub fn new(receiver: Receiver<u64>, sender: Sender<u64>) -> Self {
+    pub fn new(workload: String, receiver: Receiver<u64>, sender: Sender<u64>) -> Self {
         let request_queue = VecDeque::with_capacity(1024);
         Self {
             receiver,
@@ -34,6 +38,7 @@ impl Consumer {
             current_bs: 1,
             last_n_queue_size: Vec::with_capacity(10),
             counter: 0,
+            workload,
         }
     }
 
@@ -58,14 +63,9 @@ impl Consumer {
 
         // Is it time to reconfigure?
         if self.last_reconfig_time.elapsed() > self.reconfig_timeouts {
-            let old_bs = self.current_bs;
             self.update_bs();
-
-            if old_bs != self.current_bs {
-                info!("Reconfigured BS from {} to {}", old_bs, self.current_bs);
-                self.last_reconfig_time = Instant::now();
-                self.last_n_queue_size.clear();
-            }
+            self.last_reconfig_time = Instant::now();
+            self.last_n_queue_size.clear();
         }
     }
 
@@ -86,22 +86,44 @@ impl Consumer {
         match self.last_n_queue_size.iter().sum::<i64>() {
             0 => self.current_bs = 0,
             _ => {
+                let mut old_bs = self.current_bs;
                 let mut new_bs = self.current_bs;
                 let mut transient_bs = new_bs as f64;
 
                 for len in self.last_n_queue_size.iter() {
                     let residual_queue_len = (*len - self.current_bs as i64) as f64;
-                    transient_bs = transient_bs * 0.1 + residual_queue_len * 0.9;
+                    let bs_adjust = transient_bs * 0.3 + residual_queue_len * 0.7;
+                    transient_bs = self.current_bs as f64 + bs_adjust;
                     debug!("Expected new batch size: {}", transient_bs);
 
-                    let bs = self.current_bs as i64 + transient_bs as i64;
-                    new_bs = lower_power_of_two(bs) as usize;
+                    new_bs = lower_power_of_two(transient_bs as i64) as usize;
 
                     info!(
-                        "{:?},{},{},{},{}",
-                        self.counter, self.current_bs, residual_queue_len, bs, new_bs
+                        "{:?},{},{},{},{:.2},{}",
+                        self.counter,
+                        *len,
+                        self.current_bs,
+                        residual_queue_len,
+                        transient_bs,
+                        new_bs
+                    );
+
+                    #[cfg(not(test))]
+                    self.save_output(
+                        self.counter,
+                        *len,
+                        self.current_bs,
+                        residual_queue_len,
+                        transient_bs as i64,
+                        new_bs,
                     );
                     self.counter += 1;
+
+                    // Reset transient state if batch size changes
+                    if old_bs != new_bs {
+                        old_bs = new_bs;
+                        transient_bs = new_bs as f64;
+                    }
                 }
 
                 if new_bs != self.current_bs {
@@ -117,6 +139,42 @@ impl Consumer {
             std::process::exit(0);
         }
     }
+
+    #[cfg(not(test))]
+    fn save_output(
+        &self,
+        counter: usize,
+        requests: i64,
+        current_bs: usize,
+        residual_queue_len: f64,
+        bs: i64,
+        new_bs: usize,
+    ) {
+        let benchmark = self.workload.to_lowercase();
+        let file_name = format!("{benchmark}_benchmark.csv");
+
+        let write_headers = !Path::new(&file_name).exists();
+        let mut csv_file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(file_name)
+            .expect("Can't open file");
+        if write_headers {
+            let row = "workload,counter,requests,current_bs,residual_queue_len,bs,new_bs\n";
+            csv_file.write_all(row.as_bytes()).unwrap();
+        }
+
+        csv_file
+            .write_all(
+                format!(
+                    "{},{},{},{},{},{},{}\n",
+                    benchmark, counter, requests, current_bs, residual_queue_len, bs, new_bs
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        csv_file.flush().expect("Can't flush file");
+    }
 }
 
 #[cfg(test)]
@@ -128,7 +186,7 @@ mod tests {
     fn test_bs_increase() {
         let req_channel = channel();
         let res_channel = channel();
-        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
+        let mut consumer = Consumer::new(String::from("test"), req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
 
         (0..100).for_each(|_| consumer.last_n_queue_size.push(16));
@@ -143,7 +201,7 @@ mod tests {
     fn test_bs_decrease() {
         let req_channel = channel();
         let res_channel = channel();
-        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
+        let mut consumer = Consumer::new(String::from("test"), req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
         consumer.current_bs = 32;
 
@@ -159,7 +217,7 @@ mod tests {
     fn test_bs_no_change() {
         let req_channel = channel();
         let res_channel = channel();
-        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
+        let mut consumer = Consumer::new(String::from("test"), req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
         consumer.current_bs = 32;
 
@@ -175,7 +233,7 @@ mod tests {
     fn test_bs_increase_e2e() {
         let req_channel = channel();
         let res_channel = channel();
-        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
+        let mut consumer = Consumer::new(String::from("test"), req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
         consumer.reconfig_timeouts = Duration::from_secs(2);
         let new_bs = 16;
@@ -193,7 +251,7 @@ mod tests {
     fn test_bs_approach_to_zero() {
         let req_channel = channel();
         let res_channel = channel();
-        let mut consumer = Consumer::new(req_channel.1, res_channel.0);
+        let mut consumer = Consumer::new(String::from("test"), req_channel.1, res_channel.0);
         assert_eq!(consumer.current_bs, 1);
         consumer.reconfig_timeouts = Duration::from_secs(2);
         let new_bs = 16;

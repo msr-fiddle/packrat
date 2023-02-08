@@ -9,4 +9,4 @@ pub mod utils;
 pub const SINGLE_REQUEST_DELAY: u128 = 1;
 
 // Reconfiguration timeout in seconds
-pub const RECONFIG_TIMEOUT: Duration = Duration::from_secs(10);
+pub const RECONFIG_TIMEOUT: Duration = Duration::from_secs(1);

@@ -63,17 +63,13 @@ impl Diurnal {
 
 impl LoadGen for Diurnal {
     fn run(&mut self, sender: &mut Sender<u64>, receiver: &mut Receiver<u64>) {
-        let starting_bs = 16;
-        let mut start = std::time::Instant::now();
-
-        // Send requests for 100 seconds
-        while start.elapsed().as_secs() < RECONFIG_TIMEOUT.as_secs() {
-            self.tx_rx(starting_bs, sender, receiver);
-        }
-
-        start = std::time::Instant::now();
-        while start.elapsed().as_secs() < RECONFIG_TIMEOUT.as_secs() {
-            self.tx_rx(starting_bs * 2, sender, receiver);
+        let batch_sizes = [8, 16, 32, 64, 32, 16, 8];
+        for batch_size in batch_sizes.iter() {
+            let start = std::time::Instant::now();
+            while start.elapsed().as_secs() < RECONFIG_TIMEOUT.as_secs() {
+                self.tx_rx(*batch_size, sender, receiver);
+            }
+            self.tx_rx(*batch_size, sender, receiver);
         }
     }
 }

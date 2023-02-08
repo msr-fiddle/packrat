@@ -17,6 +17,16 @@ pub enum Workload {
     Poisson,
 }
 
+impl From<Workload> for String {
+    fn from(workload: Workload) -> Self {
+        match workload {
+            Workload::Constant => String::from("Constant"),
+            Workload::Diurnal => String::from("Diurnal"),
+            Workload::Poisson => String::from("Poisson"),
+        }
+    }
+}
+
 fn get_workload(workload: Workload) -> Box<dyn LoadGen> {
     match workload {
         Workload::Constant => Box::<Constant>::default() as Box<dyn LoadGen>,
@@ -28,6 +38,7 @@ fn get_workload(workload: Workload) -> Box<dyn LoadGen> {
 fn main() {
     let workload = Args::parse().workload;
     println!("Running Batch Size Estimator for Workload: {:?}", workload);
+    let load = String::from(workload.clone());
 
     env_logger::init();
     let (req_tx, req_rx) = channel::<u64>();
@@ -41,7 +52,7 @@ fn main() {
 
     // Spawn a thread to consume a value
     let c = std::thread::spawn(move || {
-        let mut consumer = Consumer::new(req_rx, resp_tx);
+        let mut consumer = Consumer::new(load, req_rx, resp_tx);
         loop {
             consumer.consume();
         }
