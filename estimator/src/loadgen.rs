@@ -63,7 +63,7 @@ impl Diurnal {
 
 impl LoadGen for Diurnal {
     fn run(&mut self, sender: &mut Sender<u64>, receiver: &mut Receiver<u64>) {
-        let batch_sizes = [8, 16, 32, 64, 32, 16, 8];
+        let batch_sizes = [8, 16, 32, 16, 8];
         for batch_size in batch_sizes.iter() {
             let start = std::time::Instant::now();
             while start.elapsed().as_secs() < RECONFIG_TIMEOUT.as_secs() {
@@ -103,7 +103,7 @@ impl LoadGen for Poisson {
         let rng = &mut rand::thread_rng();
 
         // Send requests for 100 seconds
-        while start.elapsed().as_secs() < RECONFIG_TIMEOUT.as_secs() {
+        while start.elapsed().as_secs() < 5 * RECONFIG_TIMEOUT.as_secs() {
             let batch_size = dist.sample(rng);
             (0..batch_size).for_each(|_| while sender.send(1).is_err() {});
             (0..batch_size).for_each(|_| while receiver.recv().is_err() {});

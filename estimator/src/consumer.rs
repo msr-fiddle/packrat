@@ -14,6 +14,7 @@ use crate::{
     RECONFIG_TIMEOUT, SINGLE_REQUEST_DELAY,
 };
 
+#[allow(dead_code)]
 pub struct Consumer {
     receiver: Receiver<u64>,
     sender: Sender<u64>,
@@ -22,6 +23,7 @@ pub struct Consumer {
     reconfig_timeouts: Duration,
     current_bs: usize,
     last_n_queue_size: Vec<i64>,
+    last_n_bs: VecDeque<usize>,
     counter: usize,
     workload: String,
 }
@@ -37,6 +39,7 @@ impl Consumer {
             reconfig_timeouts: RECONFIG_TIMEOUT,
             current_bs: 1,
             last_n_queue_size: Vec::with_capacity(10),
+            last_n_bs: VecDeque::with_capacity(10),
             counter: 0,
             workload,
         }
@@ -83,52 +86,46 @@ impl Consumer {
     }
 
     fn update_bs(&mut self) {
+        let alpha = 0.1;
         match self.last_n_queue_size.iter().sum::<i64>() {
             0 => self.current_bs = 0,
             _ => {
-                let mut old_bs = self.current_bs;
-                let mut new_bs = self.current_bs;
-                let mut transient_bs = new_bs as f64;
+                let mut stable_bs = self.current_bs;
+                let mut transient_bs = stable_bs as f64;
 
-                for len in self.last_n_queue_size.iter() {
-                    let residual_queue_len = (*len - self.current_bs as i64) as f64;
-                    let bs_adjust = transient_bs * 0.3 + residual_queue_len * 0.7;
-                    transient_bs = self.current_bs as f64 + bs_adjust;
+                for requests in self.last_n_queue_size.iter() {
+                    transient_bs = transient_bs * (1.0 - alpha) + (*requests as f64) * alpha;
                     debug!("Expected new batch size: {}", transient_bs);
 
-                    new_bs = lower_power_of_two(transient_bs as i64) as usize;
+                    let new_bs = lower_power_of_two(transient_bs.round() as i64) as usize;
 
                     info!(
-                        "{:?},{},{},{},{:.2},{}",
-                        self.counter,
-                        *len,
-                        self.current_bs,
-                        residual_queue_len,
-                        transient_bs,
-                        new_bs
+                        "{:?},{},{},{:.2},{}",
+                        self.counter, *requests, self.current_bs, transient_bs, new_bs
                     );
+
+                    // Calculate stable batch size using mode of last 10 batch sizes
+                    if self.last_n_bs.len() == 10 {
+                        self.last_n_bs.pop_front();
+                    }
+                    self.last_n_bs.push_back(new_bs);
+                    stable_bs = self.mode_bs();
 
                     #[cfg(not(test))]
                     self.save_output(
                         self.counter,
-                        *len,
+                        *requests,
                         self.current_bs,
-                        residual_queue_len,
-                        transient_bs as i64,
+                        transient_bs,
                         new_bs,
+                        stable_bs,
                     );
                     self.counter += 1;
-
-                    // Reset transient state if batch size changes
-                    if old_bs != new_bs {
-                        old_bs = new_bs;
-                        transient_bs = new_bs as f64;
-                    }
                 }
 
-                if new_bs != self.current_bs {
-                    println!(">>> Updated BS from {} to {}", self.current_bs, new_bs);
-                    self.current_bs = new_bs;
+                if stable_bs != self.current_bs {
+                    println!(">>> Updated BS from {} to {}", self.current_bs, stable_bs);
+                    self.current_bs = stable_bs;
                     assert!(self.current_bs.is_power_of_two());
                 }
             }
@@ -140,15 +137,36 @@ impl Consumer {
         }
     }
 
+    // calculate mode of last_n_bs
+    fn mode_bs(&self) -> usize {
+        let mut mode = 0;
+        let mut max_count = 0;
+        for i in 0..self.last_n_bs.len() {
+            let mut count = 0;
+            for j in 0..self.last_n_bs.len() {
+                if self.last_n_bs[i] == self.last_n_bs[j] {
+                    count += 1;
+                }
+            }
+
+            // Return the first mode found
+            if count > max_count {
+                max_count = count;
+                mode = self.last_n_bs[i];
+            }
+        }
+        mode
+    }
+
     #[cfg(not(test))]
     fn save_output(
         &self,
         counter: usize,
         requests: i64,
         current_bs: usize,
-        residual_queue_len: f64,
-        bs: i64,
+        transient_bs: f64,
         new_bs: usize,
+        stable_bs: usize,
     ) {
         let benchmark = self.workload.to_lowercase();
         let file_name = format!("{benchmark}_benchmark.csv");
@@ -160,15 +178,15 @@ impl Consumer {
             .open(file_name)
             .expect("Can't open file");
         if write_headers {
-            let row = "workload,counter,requests,current_bs,residual_queue_len,bs,new_bs\n";
+            let row = "workload,counter,requests,current_bs,transient_bs,new_bs,stable_bs\n";
             csv_file.write_all(row.as_bytes()).unwrap();
         }
 
         csv_file
             .write_all(
                 format!(
-                    "{},{},{},{},{},{},{}\n",
-                    benchmark, counter, requests, current_bs, residual_queue_len, bs, new_bs
+                    "{},{},{},{},{:.2},{},{}\n",
+                    benchmark, counter, requests, current_bs, transient_bs, new_bs, stable_bs
                 )
                 .as_bytes(),
             )
@@ -181,6 +199,34 @@ impl Consumer {
 mod tests {
     use super::*;
     use std::sync::mpsc::channel;
+
+    #[test]
+    fn test_mode_bs() {
+        let req_channel = channel();
+        let res_channel = channel();
+        let mut consumer = Consumer::new(String::from("test"), req_channel.1, res_channel.0);
+
+        fn add_bs(consumer: &mut Consumer, bs: usize) {
+            if consumer.last_n_bs.len() == 10 {
+                consumer.last_n_bs.pop_front();
+            }
+            consumer.last_n_bs.push_back(bs);
+        }
+
+        // All 1s
+        (0..10).for_each(|_| add_bs(&mut consumer, 1));
+        assert!(consumer.mode_bs() == 1);
+
+        // Half 1s, half 2s
+        (0..5).for_each(|_| add_bs(&mut consumer, 1));
+        (0..5).for_each(|_| add_bs(&mut consumer, 2));
+        assert!(consumer.mode_bs() == 1);
+
+        // More 1s than 2s
+        (0..6).for_each(|_| add_bs(&mut consumer, 1));
+        (0..4).for_each(|_| add_bs(&mut consumer, 1));
+        assert!(consumer.mode_bs() == 1);
+    }
 
     #[test]
     fn test_bs_increase() {
@@ -266,10 +312,12 @@ mod tests {
 
         let start = Instant::now();
         let new_bs = 1;
-        while start.elapsed() < consumer.reconfig_timeouts * 2 {
-            (0..new_bs).for_each(|_| req_channel.0.send(1).unwrap());
-            consumer.consume();
-        }
+        (0..2).for_each(|_| {
+            while start.elapsed() < consumer.reconfig_timeouts {
+                (0..new_bs).for_each(|_| req_channel.0.send(1).unwrap());
+                consumer.consume();
+            }
+        });
         assert!(start.elapsed() > consumer.reconfig_timeouts);
         assert_eq!(consumer.current_bs, 1);
     }
