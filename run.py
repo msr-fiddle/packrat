@@ -18,7 +18,7 @@ import psutil
 
 from utils.topology import CPUInfo, read_cpu_freq
 from utils.optimizer import Optimizer
-from benchmarks.config import Benchmark, MemoryAllocator, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning
+from benchmarks.config import Benchmark, MemoryAllocator, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning, InstanceType
 from benchmarks.cache import store
 from benchmarks.resnet import ResnetBench
 from benchmarks.inception import InceptionBench
@@ -216,8 +216,9 @@ if __name__ == '__main__':
     set_env(os.environ, arguments.pinning)
     set_memory_allocator(os.environ, MemoryAllocator[arguments.allocator])
 
-    if arguments.instance_id == 1:
-        logging.debug("Running single instance")
+    logging.debug(
+        f"Running {InstanceType(arguments.instance_id).name} instances")
+    if InstanceType(arguments.instance_id) == InstanceType.fat:
         for batch_size in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]:
             for intraop in range(1, core_count + 1):
                 config = Config(arguments)
@@ -228,11 +229,11 @@ if __name__ == '__main__':
                     target=run_single_instance, args=(config,))
                 process.start()
                 process.join()
-    else:
-        logging.debug("Running multiple instances")
+
+    elif InstanceType(arguments.instance_id) == InstanceType.packrat or InstanceType(arguments.instance_id) == InstanceType.thin:
         core_count = lower_power_of_two(core_count)
         optimizer = Optimizer(model=arguments.benchmark, allocator=arguments.allocator,
-                              optimization=arguments.optimization, profile_tag="large-batches")
+                              optimization=arguments.optimization, profile_tag="large-batches") if arguments.instance_id == InstanceType.packrat.value else None
 
         for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
             # ====================== 1 instance ======================
@@ -250,16 +251,24 @@ if __name__ == '__main__':
             # Run the multi-instance optimal configuration
             # ========================================================
             optimal_instances = []
-            optimizer.solution(core_count, batch_size,
-                               arguments.benchmark, optimal_instances)
+            if InstanceType.packrat.value == arguments.instance_id:
+                optimizer.solution(core_count, batch_size,
+                                   arguments.benchmark, optimal_instances)
+            if InstanceType.thin.value == arguments.instance_id:
+                max_instances = min(core_count, batch_size)
+                for i in range(1, max_instances + 1):
+                    optimal_instances.append((
+                        int(core_count / max_instances), int(batch_size / max_instances)))
+
             logging.info(
                 f"<{core_count}, {batch_size}> is converted to {optimal_instances}")
+
             total_instances = len(optimal_instances)
             instances, cmd, config = [], [], []
             starting_core = 0
 
             # Expected latency
-            if True:
+            if InstanceType(arguments.instance_id) == InstanceType.packrat:
                 instance0_cores = optimal_instances[0][0]
                 instance0_batch = optimal_instances[0][1]
 

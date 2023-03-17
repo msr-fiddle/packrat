@@ -66,6 +66,12 @@ class MemoryAllocator(Enum):
     jemalloc = 3
 
 
+class InstanceType(Enum):
+    fat = 1
+    packrat = 2
+    thin = 3
+
+
 class Config:
     """
     Common configurations
