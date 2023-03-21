@@ -1,4 +1,4 @@
 [submodule "torchserve/serve"]
 	path = torchserve/serve
 	url = git@github.com:ankit-iitb/serve.git
-	branch = release_0.6.1
+	branch = ewma

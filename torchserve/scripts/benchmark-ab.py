@@ -572,7 +572,7 @@ def generate_latency_output():
         final.append(int(sum(chunk) / batch_size))
     out_fname = os.path.join(
         *(execution_params["tmp_dir"], "benchmark", "latency.txt"))
-    #assert len(final) == 100
+    # assert len(final) == 100
     with open(out_fname, "w") as outf:
         final = map(lambda x: str(x) + "\n", final)
         outf.writelines(final)
@@ -1072,7 +1072,7 @@ def run_ab(version, requests):
     ab_cmd = (
         f"ab -s 120 -c {execution_params['concurrency']}  -n {requests} -k -p "
         f"{execution_params['tmp_dir']}/benchmark/input -T  {execution_params['content_type']} "
-        f"{execution_params['inference_url']}/{execution_params['inference_model_url']}/{version} > "
+        f"{execution_params['inference_url']}/{execution_params['inference_model_url']} > "
         f"{execution_params['result_file']}"
     )
     execute(ab_cmd, wait=True)
@@ -1129,28 +1129,11 @@ def bench(old_batch: int, new_batch: int):
     check_torchserve_health()
     warm_up_lines = warm_up()
     register_model_with_version("2.0")
-    run_ab("1.0", old_batch * 100)
+    run_ab("1.0", old_batch * 125)
 
-    # Run the suboptimal old batch size
+    # Run the new batch size
     execution_params['concurrency'] = new_batch
-    run_ab("1.0", old_batch * 100)
-
-    # Run the optimal new batch size
-    workers = batch_config("2.0", core_count, new_batch)
-    scale_workers("2.0", workers)
-
-    ready = False
-    while not ready:
-        run_ab("1.0", old_batch * 50)
-        model_config = check_model_config("2.0")
-        if len(model_config[0]["workers"]) == workers:
-            ready = True
-            for worker in model_config[0]["workers"]:
-                ready = ready and worker["status"] == "READY"
-
-    scale_workers("1.0", 0)
-    run_ab("2.0", new_batch * 100)
-
+    run_ab("2.0", old_batch * 500)
 
 def config_change():
     # Batch 8 and 64
