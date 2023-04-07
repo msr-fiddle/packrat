@@ -5,4 +5,4 @@ date,revision,resnetbench,inceptionbench,gptbench,bertbench,comments
 21-11-2022,torchserve,index.html,,,,TS with inefficient pre-processing
 21-11-2022,torchserve-opt,index.html,,,index.html, TS with efficient pre-processing + TS vs PT
 17-01-2023,torchserve-allocators,index.html,index.html,index.html,index.html,Default vs tcmalloc for TS
-03-04-2023,pytorch-granular,index.html,,,,PT with granular BS (1-32 & ^2)
+03-04-2023,pytorch-granular,index.html,,index.html,,PT with granular BS (1-32 & ^2)

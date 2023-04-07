@@ -3,8 +3,6 @@ layout: scalebench
 title:  "ResNet50"
 ---
 
-[NUMA Effects](#numa-effects)
-
 # Latency (Sequential)
 
 ## Latency Per Batch
