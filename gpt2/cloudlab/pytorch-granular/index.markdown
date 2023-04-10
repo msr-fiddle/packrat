@@ -98,11 +98,6 @@ title:  "GPT2"
 <img src="./gpt2-throughput-script.png" alt="GPT2 Throughput Opt=Script" width="100%"/>
 </p>
 
-## Speedup
-<p float="left">
-<img src="./gpt2-throughput-speedup-script.png" alt="GPT2 Throoughput Opt=Script" width="100%"/>
-</p>
-
 ## Throughput Per Batch
 <p float="left">
 <img src="./gpt2-throughput-script-perBS.png" alt="GPT2 Throughput per BS" width="100%"/>
