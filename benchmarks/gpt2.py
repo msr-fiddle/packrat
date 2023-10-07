@@ -16,9 +16,9 @@ class GptBench(implements(Bench)):
         model = self.get_model(config)
         data = self.get_test_data(config)
 
-        if config.optimization == "script":
+        if config.optimization.name == "script":
             model = torch.jit.trace(model, data)
-            model = model.optimize_for_inference()
+            model = torch.jit.optimize_for_inference(model)
 
         if config.run_type == RunType.default:
             self.inference_benchmark(config, model, data)
