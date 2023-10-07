@@ -17,7 +17,7 @@ class BertBench(implements(Bench)):
         model = self.get_model(config)
         data, segments = self.get_test_data(config)
 
-        if config.optimization == "script":
+        if config.optimization.name == "script":
             model = torch.jit.trace(model, data)
             model = model.optimize_for_inference()
 

@@ -11,7 +11,7 @@ import time
 import csv
 import logging
 import math
-from multiprocessing import Process, set_start_method
+from multiprocessing import Process, set_start_method, Barrier
 import os
 from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 import psutil
@@ -21,9 +21,7 @@ from utils.optimizer import Optimizer
 from benchmarks.config import Benchmark, MemoryAllocator, ModelSource, Optimizations, RunType, Config, ThreadMapping, ThreadPinning, InstanceType
 from benchmarks.cache import store
 from benchmarks.resnet import ResnetBench
-from benchmarks.inception import InceptionBench
 from benchmarks.gpt2 import GptBench
-from benchmarks.bert import BertBench
 from benchmarks.bench import Bench
 
 
@@ -44,7 +42,7 @@ def parse_args():
                       help="Pick a thread mapping.")
     args.add_argument("--batch-size", type=int, default=1,
                       help="The batch size")
-    args.add_argument("--iterations", type=int, default=100,
+    args.add_argument("--iterations", type=int, default=10,
                       help="The number of iterations")
     args.add_argument("--interop-threads", type=int, default=1,
                       help="The number of interop threads")
@@ -88,6 +86,9 @@ def set_env(env, pinning: ThreadPinning):
     Set the environment variable
     """
     env["KMP_BLOCKTIME"] = "1"
+    env["OMP_DYNAMIC"] = "FALSE"
+    env["KMP_DYNAMIC"] = "FALSE"
+    env["OMP_WAIT_POLICY"] = "PASSIVE"
 
     if pinning == ThreadPinning.omp:
         env["OMP_SCHEDULE"] = "STATIC"
@@ -133,10 +134,12 @@ def update_config(config: Config, instance_id: int, thread_mapping: str, batch_s
     return config
 
 
-def run_single_instance(config: Config):
+def run_single_instance(config: Config, barrier: Barrier):
     """
     Run the benchmark with the given parameters
     """
+
+    barrier.wait()
 
     logging.debug("Running the benchmark with %s", config)
     if config.run_type == RunType.manual and config.pinnning == ThreadPinning.numactl:
@@ -145,17 +148,13 @@ def run_single_instance(config: Config):
     bench: Bench = None
     if config.benchmark == Benchmark.resnet:
         bench = ResnetBench()
-    elif config.benchmark == Benchmark.inception:
-        bench = InceptionBench()
-    elif config.benchmark == Benchmark.gpt2:
+    if config.benchmark == Benchmark.gpt2:
         bench = GptBench()
-    elif config.benchmark == Benchmark.bert:
-        bench = BertBench()
     else:
         raise Exception("Unknown benchmark")
 
     bench.latencies = [None] * (config.iterations)
-    bench.run(config)
+    bench.run(config, barrier)
     bench.report(config)
 
 
@@ -215,18 +214,20 @@ if __name__ == '__main__':
 
     set_env(os.environ, arguments.pinning)
     set_memory_allocator(os.environ, MemoryAllocator[arguments.allocator])
+    bs = 64
 
     logging.debug(
         f"Running {InstanceType(arguments.instance_id).name} instances")
     if InstanceType(arguments.instance_id) == InstanceType.fat:
-        for batch_size in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]:
-            for intraop in range(1, core_count + 1):
+        for batch_size in [bs]:
+            for intraop in range(core_count, core_count + 1):
+                barrier = Barrier(1)
                 config = Config(arguments)
                 config = update_config(config, arguments.instance_id, arguments.mapping,
                                        batch_size, intraop, proclist[0:intraop])
 
                 process = Process(
-                    target=run_single_instance, args=(config,))
+                    target=run_single_instance, args=(config,barrier))
                 process.start()
                 process.join()
 
@@ -235,51 +236,20 @@ if __name__ == '__main__':
         optimizer = Optimizer(model=arguments.benchmark, allocator=arguments.allocator,
                               optimization=arguments.optimization, profile_tag="large-batches") if arguments.instance_id == InstanceType.packrat.value else None
 
-        for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
-            # ====================== 1 instance ======================
-            # Run single instance baseline <core_count, batch_size>
-            # ========================================================
-            config = Config(arguments)
-            config = update_config(config, 0, arguments.mapping,
-                                   batch_size, core_count, proclist[0:core_count])
-            process = Process(
-                target=run_single_instance, args=(config,))
-            process.start()
-            process.join()
-
+        for batch_size in [bs]:
+            num_instances = 4
             # ================ Multiple instances ====================
             # Run the multi-instance optimal configuration
             # ========================================================
             optimal_instances = []
-            if InstanceType.packrat.value == arguments.instance_id:
-                optimizer.solution(core_count, batch_size,
-                                   arguments.benchmark, optimal_instances)
-            if InstanceType.thin.value == arguments.instance_id:
-                max_instances = min(core_count, batch_size)
-                for i in range(1, max_instances + 1):
-                    optimal_instances.append((
-                        int(core_count / max_instances), int(batch_size / max_instances)))
-
-            logging.info(
-                f"<{core_count}, {batch_size}> is converted to {optimal_instances}")
-
+            for i in range(num_instances):
+                    optimal_instances.append((int(core_count/num_instances), int(batch_size/num_instances)))
+            print(optimal_instances)
             total_instances = len(optimal_instances)
             instances, cmd, config = [], [], []
             starting_core = 0
 
-            # Expected latency
-            if InstanceType(arguments.instance_id) == InstanceType.packrat:
-                instance0_cores = optimal_instances[0][0]
-                instance0_batch = optimal_instances[0][1]
-
-                instance0_config = Config(arguments)
-                instance0_config = update_config(instance0_config, 0, arguments.mapping, instance0_batch,
-                                                 instance0_cores, proclist[starting_core:starting_core + instance0_cores])
-                p0 = Process(
-                    target=run_single_instance, args=(instance0_config,))
-                p0.start()
-                p0.join()
-
+            barrier = Barrier(total_instances)
             for i in range(total_instances):
                 cores_per_instance = optimal_instances[i][0]
                 batch_per_instance = optimal_instances[i][1]
@@ -291,7 +261,7 @@ if __name__ == '__main__':
                 starting_core += cores_per_instance
 
                 p = Process(
-                    target=run_single_instance, args=(config[i],))
+                    target=run_single_instance, args=(config[i], barrier))
                 instances.append(p)
 
             for instance in instances:

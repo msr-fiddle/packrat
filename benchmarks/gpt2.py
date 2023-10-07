@@ -6,24 +6,25 @@ import timeit
 import torch
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from interface import implements
+import time
 
 from .bench import Bench
 from .config import Benchmark, Config, RunType
 
 
 class GptBench(implements(Bench)):
-    def run(self, config: Config) -> None:
+    def run(self, config: Config, barrier) -> None:
         model = self.get_model(config)
         data = self.get_test_data(config)
 
-        if config.optimization == "script":
+        if config.optimization.name == "script":
+            model.requires_grad_(False)
             model = torch.jit.trace(model, data)
-            model = model.optimize_for_inference()
 
         if config.run_type == RunType.default:
             self.inference_benchmark(config, model, data)
         elif config.run_type == RunType.manual:
-            self.inference_manual(config, model, data)
+            self.inference_manual(config, model, data, barrier)
 
     def warmup(self, model, data):
         with torch.no_grad():
@@ -46,7 +47,7 @@ class GptBench(implements(Bench)):
     def run_inference(self, model: torch.nn.Module, data: torch.Tensor):
         return model(data)
 
-    def inference_manual(self, config: Config, model: torch.nn.Module, data: torch.Tensor):
+    def inference_manual(self, config: Config, model: torch.nn.Module, data: torch.Tensor, barrier):
         torch.set_num_threads(config.intraop_threads)
         torch.set_num_interop_threads(config.interop_threads)
 
@@ -59,6 +60,8 @@ class GptBench(implements(Bench)):
         for index in range(config.iterations):
             self.latencies[index] = timeit.Timer(
                 lambda: self.run_inference(model, data)).timeit(number=1)
+            barrier.wait()
+            time.sleep(5)
 
     def inference_benchmark(self, model, data):
         import torch.utils.benchmark as benchmark
