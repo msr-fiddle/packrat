@@ -85,40 +85,51 @@ class Bench(Interface):
                config.instance_id, config.interop_threads, config.intraop_threads, config.batch_size]
 
         def report_latency():
-            if len(self.latencies) > 0:
+            if not self.latencies:
+                print(
+                    f"[WARN] no latency samples for {benchmark}", file=sys.stderr)
+                return
+            else:
                 self.latencies.sort()
-                filename = config.benchmark.name + "_latency.csv"
-                exists = os.path.isfile(filename)
-                l_file = open(filename, "a+")
-                writer = csv.writer(l_file, delimiter=",")
-
-                if not exists:
-                    writer.writerow(
-                        row_header + ["latency(min)", "latency(avg)", "latency(max)", "flops"])
-                min, max, avg = self.latencies[0] * 1000,  (sum(self.latencies) / len(
-                    self.latencies)) * 1000, self.latencies[-1] * 1000
+                min = self.latencies[0] * 1000
+                max = self.latencies[-1] * 1000
+                avg = (sum(self.latencies) / len(self.latencies)) * 1000
                 lat = sum(self.latencies)
                 flops = (config.flops / lat)/1e9
-                fcntl.flock(l_file, fcntl.LOCK_EX)
-                writer.writerow(
-                    row + [min, max, avg, flops])
-                fcntl.flock(l_file, fcntl.LOCK_UN)
+
+                filename = config.benchmark.name + "_latency.csv"
+                exists = os.path.isfile(filename)
+
+                with open(filename, "a+", newline="") as f:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                    writer = csv.writer(f, delimiter=",")
+                    if not exists:
+                        writer.writerow(
+                            row_header + ["latency(min)", "latency(avg)", "latency(max)", "flops"])
+
+                    writer.writerow(row + [min, max, avg, flops])
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    os.fsync(f.fileno())
 
         def report_throughput():
-            if len(self.latencies) > 0:
-                filename = config.benchmark.name + "_throughput.csv"
-                exists = os.path.isfile(filename)
-                t_file = open(filename, "a+")
-                writer = csv.writer(t_file, delimiter=",")
-                if not exists:
-                    writer.writerow(
-                        row_header + ["throughput"])
+            if not self.latencies:
+                print(
+                    f"[WARN] no throughput samples for {benchmark}", file=sys.stderr)
+                return
+            else:
                 throughput = (config.batch_size *
                               config.iterations) / sum(self.latencies)
-                fcntl.flock(t_file, fcntl.LOCK_EX)
-                writer.writerow(
-                    row + [throughput])
-                fcntl.flock(t_file, fcntl.LOCK_UN)
+                filename = config.benchmark.name + "_throughput.csv"
+                exists = os.path.isfile(filename)
+
+                with open(filename, "a+", newline="") as f:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                    writer = csv.writer(f, delimiter=",")
+                    if not exists:
+                        writer.writerow(row_header + ["throughput"])
+                    writer.writerow(row + [throughput])
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    os.fsync(f.fileno())
 
         report_latency()
         report_throughput()

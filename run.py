@@ -232,7 +232,7 @@ if __name__ == '__main__':
 
     elif InstanceType(arguments.instance_id) == InstanceType.packrat or InstanceType(arguments.instance_id) == InstanceType.thin:
         core_count = lower_power_of_two(core_count)
-        optimizer = Optimizer(model=arguments.benchmark, allocator=arguments.allocator,
+        optimizer = Optimizer(framework="pytorch", model=arguments.benchmark, allocator=arguments.allocator,
                               optimization=arguments.optimization, profile_tag="large-batches") if arguments.instance_id == InstanceType.packrat.value else None
 
         for batch_size in [8, 16, 32, 64, 128, 256, 512, 1024]:
