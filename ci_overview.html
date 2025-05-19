@@ -1,0 +1,74 @@
+---
+layout: default
+---
+
+<div class="home">
+
+  <h1 class="page-heading">Benchmarks Cloudlab Server (2 socket)</h1>
+
+  <table class="post-table">
+    <tr>
+      <th>Date</th>
+      <th>Revision</th>
+      <th>ResNet50</th>
+      <th>Inception</th>
+      <th>GPT2</th>
+      <th>Bert</th>
+      <th>Comments</th>
+    </tr>
+    {% for post in site.data.cloudlab %}
+    <tr>
+      <td>{{ post.date }}</td>
+      <td>{{ post.revision }}</td>
+      <td> {% if post.resnetbench %}
+        <a href="{{ site.baseurl }}resnet/cloudlab/{{ post.revision }}/{{ post.resnetbench }}">ResNet50</a>{% endif %}
+      </td>
+      <td> {% if post.inceptionbench %}
+        <a href="{{ site.baseurl }}inception/cloudlab/{{ post.revision }}/{{ post.inceptionbench }}">Inception</a>{%
+        endif %}
+      </td>
+      <td> {% if post.gptbench %}
+        <a href="{{ site.baseurl }}gpt2/cloudlab/{{ post.revision }}/{{ post.gptbench }}">GPT2</a>{% endif %}
+      </td>
+      <td> {% if post.bertbench %}
+        <a href="{{ site.baseurl }}bert/cloudlab/{{ post.revision }}/{{ post.bertbench }}">Bert</a>{% endif %}
+      </td>
+      <td style="font-size:16px">{{ post.comments }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h1 class="page-heading">Benchmarks Fiddle Server (2 socket)</h1>
+
+  <table class="post-table">
+    <tr>
+      <th>Date</th>
+      <th>Revision</th>
+      <th>ResNet50</th>
+      <th>Inception</th>
+      <th>GPT2</th>
+      <th>Bert</th>
+      <th>Comments (for PT)</th>
+    </tr>
+    {% for post in site.data.skylake2x %}
+    <tr>
+      <td>{{ post.date }}</td>
+      <td>{{ post.revision }}</td>
+      <td> {% if post.resnetbench %}
+        <a href="{{ site.baseurl }}resnet/skylake2x/{{ post.revision }}/{{ post.resnetbench }}">ResNet50</a>{% endif %}
+      </td>
+      <td> {% if post.inceptionbench %}
+        <a href="{{ site.baseurl }}inception/skylake2x/{{ post.revision }}/{{ post.inceptionbench }}">Inception</a>{%
+        endif %}
+      </td>
+      <td> {% if post.gptbench %}
+        <a href="{{ site.baseurl }}gpt2/skylake2x/{{ post.revision }}/{{ post.gptbench }}">GPT2</a>{% endif %}
+      </td>
+      <td> {% if post.bertbench %}
+        <a href="{{ site.baseurl }}bert/skylake2x/{{ post.revision }}/{{ post.bertbench }}">Bert</a>{% endif %}
+      </td>
+      <td style="font-size:16px">{{ post.comments }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
