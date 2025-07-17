@@ -1,5 +1,6 @@
 # Test data
 **/*.jpg
+**/_site
 
 # Python related files
 **/__pycache__/**
